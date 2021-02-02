@@ -352,6 +352,10 @@ func SetEnvironment(env string) {
 	raven.SetEnvironment(env)
 }
 
+func SetRelease(rel string) {
+	raven.SetRelease(rel)
+}
+
 //SetTraceId updates the traceID based on context values
 func SetTraceId(ctx context.Context) context.Context {
 	if GetTraceId(ctx) != "" {
