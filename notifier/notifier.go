@@ -9,9 +9,8 @@ import (
 	"strings"
 
 	bugsnag "github.com/bugsnag/bugsnag-go"
-	"github.com/go-coldbrew/errors"
-
 	raven "github.com/getsentry/raven-go"
+	"github.com/go-coldbrew/errors"
 	"github.com/go-coldbrew/log"
 	"github.com/go-coldbrew/log/loggers"
 	"github.com/go-coldbrew/options"
@@ -342,7 +341,7 @@ func Close() {
 	}
 }
 
-func SetEnvironemnt(env string) {
+func SetEnvironment(env string) {
 	if airbrake != nil {
 		airbrake.AddFilter(func(notice *gobrake.Notice) *gobrake.Notice {
 			notice.Context["environment"] = env
