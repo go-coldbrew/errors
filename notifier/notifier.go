@@ -17,6 +17,7 @@ import (
 	stdopentracing "github.com/opentracing/opentracing-go"
 	"github.com/pborman/uuid"
 	"github.com/stvp/rollbar"
+	"google.golang.org/grpc/metadata"
 	gobrake "gopkg.in/airbrake/gobrake.v2"
 )
 
@@ -27,11 +28,20 @@ var (
 	sentryInited  bool
 	serverRoot    string
 	hostname      string
+	traceHeader   string = "x-trace-id"
 )
 
 const (
 	tracerID = "tracerId"
 )
+
+func SetTraceHeaderName(name string) {
+	traceHeader = name
+}
+
+func GetTraceHeaderName() string {
+	return traceHeader
+}
 
 type isTags interface {
 	isTags()
@@ -362,7 +372,14 @@ func SetTraceId(ctx context.Context) context.Context {
 		return ctx
 	}
 	var traceID string
-	if span := stdopentracing.SpanFromContext(ctx); span != nil {
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if id, ok := md["grpcmetadata-"+traceHeader]; ok {
+			traceID = strings.Join(id, ",")
+		} else if id, ok := md[traceHeader]; ok {
+			traceID = strings.Join(id, ",")
+		}
+	}
+	if span := stdopentracing.SpanFromContext(ctx); span != nil && strings.TrimSpace(traceID) == "" {
 		traceID = span.BaggageItem("trace")
 	}
 	// if no trace id then create one
