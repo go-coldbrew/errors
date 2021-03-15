@@ -4,6 +4,7 @@ the error objects created by this package are compatible with https://golang.org
 How To Use
 
 The simplest way to use this package is by calling one of the two functions
+
 	errors.New(...)
 	errors.Wrap(...)
 
