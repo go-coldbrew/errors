@@ -14,8 +14,8 @@ import (
 	"github.com/go-coldbrew/log"
 	"github.com/go-coldbrew/log/loggers"
 	"github.com/go-coldbrew/options"
+	"github.com/google/uuid"
 	stdopentracing "github.com/opentracing/opentracing-go"
-	"github.com/pborman/uuid"
 	"github.com/stvp/rollbar"
 	"google.golang.org/grpc/metadata"
 	gobrake "gopkg.in/airbrake/gobrake.v2"
@@ -384,7 +384,11 @@ func SetTraceId(ctx context.Context) context.Context {
 	}
 	// if no trace id then create one
 	if strings.TrimSpace(traceID) == "" {
-		traceID = uuid.NewUUID().String()
+		u, err := uuid.NewRandom()
+		if err != nil {
+			u, _ = uuid.NewUUID()
+		}
+		traceID = u.String()
 	}
 	ctx = loggers.AddToLogContext(ctx, "trace", traceID)
 	return options.AddToOptions(ctx, tracerID, traceID)
