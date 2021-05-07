@@ -408,7 +408,8 @@ func GetTraceId(ctx context.Context) string {
 			return traceID
 		}
 	}
-	return ""
+
+	return uuid.New().String()
 }
 
 //UpdateTraceId force updates the traced id to provided id
