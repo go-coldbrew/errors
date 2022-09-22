@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	bugsnag "github.com/bugsnag/bugsnag-go"
 	raven "github.com/getsentry/raven-go"
 	"github.com/go-coldbrew/errors"
 	"github.com/go-coldbrew/log"
@@ -23,7 +22,6 @@ import (
 
 var (
 	airbrake      *gobrake.Notifier
-	bugsnagInited bool
 	rollbarInited bool
 	sentryInited  bool
 	serverRoot    string
@@ -61,13 +59,7 @@ func InitAirbrake(projectID int64, projectKey string) {
 	airbrake = gobrake.NewNotifier(projectID, projectKey)
 }
 
-//InitBugsnag inits bugsnag configuration
-func InitBugsnag(config bugsnag.Configuration) {
-	bugsnag.Configure(config)
-	bugsnagInited = true
-}
-
-//InitRollbar inits rollbar configuration
+// InitRollbar inits rollbar configuration
 func InitRollbar(token, env string) {
 	rollbar.Token = token
 	rollbar.Environment = env
@@ -146,9 +138,12 @@ func parseRawData(ctx context.Context, rawData ...interface{}) (extraData map[st
 		}
 	}
 	if logFields := loggers.FromContext(ctx); logFields != nil {
-		for k, v := range logFields {
-			extraData[k] = v
-		}
+		logFields.Range(func(k, v interface{}) bool {
+			if str, ok := k.(string); ok {
+				extraData[str] = v
+			}
+			return true
+		})
 	}
 	return
 }
@@ -236,9 +231,6 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 		airbrake.SendNoticeAsync(n)
 	}
 
-	if bugsnagInited {
-		bugsnag.Notify(errWithStack, list...)
-	}
 	parsedData, tagData := parseRawData(ctx, list...)
 	if rollbarInited {
 		fields := []*rollbar.Field{}
@@ -302,9 +294,6 @@ func NotifyWithExclude(err error, rawData ...interface{}) error {
 }
 
 func NotifyOnPanic(rawData ...interface{}) {
-	if bugsnagInited {
-		defer bugsnag.AutoNotify(rawData...)
-	}
 	if airbrake != nil {
 		defer airbrake.NotifyOnPanic()
 	}
@@ -366,7 +355,7 @@ func SetRelease(rel string) {
 	raven.SetRelease(rel)
 }
 
-//SetTraceId updates the traceID based on context values
+// SetTraceId updates the traceID based on context values
 func SetTraceId(ctx context.Context) context.Context {
 	if GetTraceId(ctx) != "" {
 		return ctx
@@ -394,7 +383,7 @@ func SetTraceId(ctx context.Context) context.Context {
 	return options.AddToOptions(ctx, tracerID, traceID)
 }
 
-//GetTraceId fetches traceID from context
+// GetTraceId fetches traceID from context
 func GetTraceId(ctx context.Context) string {
 	if o := options.FromContext(ctx); o != nil {
 		if data, found := o.Get(tracerID); found {
@@ -402,16 +391,17 @@ func GetTraceId(ctx context.Context) string {
 		}
 	}
 	if logCtx := loggers.FromContext(ctx); logCtx != nil {
-		if data, found := logCtx["trace"]; found {
-			traceID := data.(string)
-			options.AddToOptions(ctx, tracerID, traceID)
-			return traceID
+		if data, found := logCtx.Load("trace"); found {
+			if traceID, ok := data.(string); ok {
+				options.AddToOptions(ctx, tracerID, traceID)
+				return traceID
+			}
 		}
 	}
 	return ""
 }
 
-//UpdateTraceId force updates the traced id to provided id
+// UpdateTraceId force updates the traced id to provided id
 func UpdateTraceId(ctx context.Context, traceID string) context.Context {
 	if traceID == "" {
 		return SetTraceId(ctx)
