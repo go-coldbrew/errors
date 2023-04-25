@@ -33,10 +33,14 @@ const (
 	tracerID = "tracerId"
 )
 
+// SetTraceHeaderName sets the header name for trace id
+// default is x-trace-id
 func SetTraceHeaderName(name string) {
 	traceHeader = name
 }
 
+// GetTraceHeaderName gets the header name for trace id
+// default is x-trace-id
 func GetTraceHeaderName() string {
 	return traceHeader
 }
@@ -55,17 +59,23 @@ func (tags Tags) value() map[string]string {
 }
 
 // InitAirbrake inits airbrake configuration
+// projectID: airbrake project id
+// projectKey: airbrake project key
 func InitAirbrake(projectID int64, projectKey string) {
 	airbrake = gobrake.NewNotifier(projectID, projectKey)
 }
 
 // InitRollbar inits rollbar configuration
+// token: rollbar token
+// env: rollbar environment
 func InitRollbar(token, env string) {
 	rollbar.Token = token
 	rollbar.Environment = env
 	rollbarInited = true
 }
 
+// InitSentry inits sentry configuration
+// dsn: sentry dsn
 func InitSentry(dsn string) {
 	raven.SetDSN(dsn)
 	sentryInited = true
@@ -123,6 +133,7 @@ func convToSentry(in errors.ErrorExt) *raven.Stacktrace {
 	return out
 }
 
+// parseRawData parses raw data to extra data and tags
 func parseRawData(ctx context.Context, rawData ...interface{}) (extraData map[string]interface{}, tagData []map[string]string) {
 	extraData = make(map[string]interface{})
 
@@ -148,14 +159,29 @@ func parseRawData(ctx context.Context, rawData ...interface{}) (extraData map[st
 	return
 }
 
+// Notify notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored
+// err: error to notify
+// rawData: extra data to notify with error (can be context.Context, Tags, or any other data)
+// when rawData is context.Context, it will used to get extra data from loggers.FromContext(ctx) and tags from metadata
 func Notify(err error, rawData ...interface{}) error {
 	return NotifyWithLevelAndSkip(err, 2, rollbar.ERR, rawData...)
 }
 
+// NotifyWithLevel notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored
+// err: error to notify
+// level: error level
+// rawData: extra data to notify with error (can be context.Context, Tags, or any other data)
+// when rawData is context.Context, it will used to get extra data from loggers.FromContext(ctx) and tags from metadata
 func NotifyWithLevel(err error, level string, rawData ...interface{}) error {
 	return NotifyWithLevelAndSkip(err, 2, level, rawData...)
 }
 
+// NotifyWithLevelAndSkip notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored
+// err: error to notify
+// skip: skip stack frames when notify error
+// level: error level
+// rawData: extra data to notify with error (can be context.Context, Tags, or any other data)
+// when rawData is context.Context, it will used to get extra data from loggers.FromContext(ctx) and tags from metadata
 func NotifyWithLevelAndSkip(err error, skip int, level string, rawData ...interface{}) error {
 	if err == nil {
 		return nil
@@ -268,6 +294,10 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 	return err
 }
 
+// NotifyWithExclude notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored
+// err: error to notify
+// rawData: extra data to notify with error (can be context.Context, Tags, or any other data)
+// when rawData is context.Context, it will used to get extra data from loggers.FromContext(ctx) and tags from metadata
 func NotifyWithExclude(err error, rawData ...interface{}) error {
 	if err == nil {
 		return nil
@@ -293,6 +323,12 @@ func NotifyWithExclude(err error, rawData ...interface{}) error {
 	return err
 }
 
+// NotifyOnPanic notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored
+// rawData: extra data to notify with error (can be context.Context, Tags, or any other data)
+// when rawData is context.Context, it will used to get extra data from loggers.FromContext(ctx) and tags from metadata
+// this function should be called in defer
+// example: defer NotifyOnPanic(ctx, "some data")
+// example: defer NotifyOnPanic(ctx, "some data", Tags{"tag1": "value1"})
 func NotifyOnPanic(rawData ...interface{}) {
 	if airbrake != nil {
 		defer airbrake.NotifyOnPanic()
@@ -334,12 +370,17 @@ func NotifyOnPanic(rawData ...interface{}) {
 	}
 }
 
+// Close closes the airbrake notifier and flushes the error queue.
+// You should call Close before app shutdown.
+// Close doesn't call os.Exit.
 func Close() {
 	if airbrake != nil {
 		airbrake.Close()
 	}
 }
 
+// SetEnvironment sets the environment.
+// The environment is used to distinguish errors occurring in different
 func SetEnvironment(env string) {
 	if airbrake != nil {
 		airbrake.AddFilter(func(notice *gobrake.Notice) *gobrake.Notice {
@@ -351,11 +392,15 @@ func SetEnvironment(env string) {
 	raven.SetEnvironment(env)
 }
 
+// SetRelease sets the release tag.
+// The release tag is used to group errors together by release.
 func SetRelease(rel string) {
 	raven.SetRelease(rel)
 }
 
 // SetTraceId updates the traceID based on context values
+// if no trace id is found then it will create one and update the context
+// You should use the context returned by this function instead of the one passed
 func SetTraceId(ctx context.Context) context.Context {
 	if GetTraceId(ctx) != "" {
 		return ctx
@@ -384,6 +429,7 @@ func SetTraceId(ctx context.Context) context.Context {
 }
 
 // GetTraceId fetches traceID from context
+// if no trace id is found then it will return empty string
 func GetTraceId(ctx context.Context) string {
 	if o := options.FromContext(ctx); o != nil {
 		if data, found := o.Get(tracerID); found {
@@ -402,6 +448,8 @@ func GetTraceId(ctx context.Context) string {
 }
 
 // UpdateTraceId force updates the traced id to provided id
+// if no trace id is found then it will create one and update the context
+// You should use the context returned by this function instead of the one passed
 func UpdateTraceId(ctx context.Context, traceID string) context.Context {
 	if traceID == "" {
 		return SetTraceId(ctx)
@@ -410,10 +458,14 @@ func UpdateTraceId(ctx context.Context, traceID string) context.Context {
 	return options.AddToOptions(ctx, tracerID, traceID)
 }
 
+// SetServerRoot sets the root directory of the project.
+// The root directory is used to trim prefixes from filenames in stack traces.
 func SetServerRoot(path string) {
 	serverRoot = path
 }
 
+// SetHostname sets the hostname of the server.
+// The hostname is used to identify the server that logged an error.
 func SetHostname(name string) {
 	hostname = name
 }
