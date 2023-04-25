@@ -14,7 +14,6 @@ import "github.com/go-coldbrew/errors/notifier"
 - [func GetTraceHeaderName() string](<#func-gettraceheadername>)
 - [func GetTraceId(ctx context.Context) string](<#func-gettraceid>)
 - [func InitAirbrake(projectID int64, projectKey string)](<#func-initairbrake>)
-- [func InitBugsnag(config bugsnag.Configuration)](<#func-initbugsnag>)
 - [func InitRollbar(token, env string)](<#func-initrollbar>)
 - [func InitSentry(dsn string)](<#func-initsentry>)
 - [func Notify(err error, rawData ...interface{}) error](<#func-notify>)
@@ -32,41 +31,37 @@ import "github.com/go-coldbrew/errors/notifier"
 - [type Tags](<#type-tags>)
 
 
-## func [Close](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L348>)
+## func [Close](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L376>)
 
 ```go
 func Close()
 ```
 
-## func [GetTraceHeaderName](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L42>)
+Close closes the airbrake notifier and flushes the error queue. You should call Close before app shutdown. Close doesn't call os.Exit.
+
+## func [GetTraceHeaderName](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L44>)
 
 ```go
 func GetTraceHeaderName() string
 ```
 
-## func [GetTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L394>)
+GetTraceHeaderName gets the header name for trace id default is x\-trace\-id
+
+## func [GetTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L433>)
 
 ```go
 func GetTraceId(ctx context.Context) string
 ```
 
-GetTraceId fetches traceID from context
+GetTraceId fetches traceID from context if no trace id is found then it will return empty string
 
-## func [InitAirbrake](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L60>)
+## func [InitAirbrake](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L64>)
 
 ```go
 func InitAirbrake(projectID int64, projectKey string)
 ```
 
-InitAirbrake inits airbrake configuration
-
-## func [InitBugsnag](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L65>)
-
-```go
-func InitBugsnag(config bugsnag.Configuration)
-```
-
-InitBugsnag inits bugsnag configuration
+InitAirbrake inits airbrake configuration projectID: airbrake project id projectKey: airbrake project key
 
 ## func [InitRollbar](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L71>)
 
@@ -74,67 +69,87 @@ InitBugsnag inits bugsnag configuration
 func InitRollbar(token, env string)
 ```
 
-InitRollbar inits rollbar configuration
+InitRollbar inits rollbar configuration token: rollbar token env: rollbar environment
 
-## func [InitSentry](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L77>)
+## func [InitSentry](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L79>)
 
 ```go
 func InitSentry(dsn string)
 ```
 
-## func [Notify](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L156>)
+InitSentry inits sentry configuration dsn: sentry dsn
+
+## func [Notify](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L166>)
 
 ```go
 func Notify(err error, rawData ...interface{}) error
 ```
 
-## func [NotifyOnPanic](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L304>)
+Notify notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored err: error to notify rawData: extra data to notify with error \(can be context.Context, Tags, or any other data\) when rawData is context.Context, it will used to get extra data from loggers.FromContext\(ctx\) and tags from metadata
+
+## func [NotifyOnPanic](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L332>)
 
 ```go
 func NotifyOnPanic(rawData ...interface{})
 ```
 
-## func [NotifyWithExclude](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L279>)
+NotifyOnPanic notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored rawData: extra data to notify with error \(can be context.Context, Tags, or any other data\) when rawData is context.Context, it will used to get extra data from loggers.FromContext\(ctx\) and tags from metadata this function should be called in defer example: defer NotifyOnPanic\(ctx, "some data"\) example: defer NotifyOnPanic\(ctx, "some data", Tags\{"tag1": "value1"\}\)
+
+## func [NotifyWithExclude](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L301>)
 
 ```go
 func NotifyWithExclude(err error, rawData ...interface{}) error
 ```
 
-## func [NotifyWithLevel](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L160>)
+NotifyWithExclude notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored err: error to notify rawData: extra data to notify with error \(can be context.Context, Tags, or any other data\) when rawData is context.Context, it will used to get extra data from loggers.FromContext\(ctx\) and tags from metadata
+
+## func [NotifyWithLevel](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L175>)
 
 ```go
 func NotifyWithLevel(err error, level string, rawData ...interface{}) error
 ```
 
-## func [NotifyWithLevelAndSkip](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L164>)
+NotifyWithLevel notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored err: error to notify level: error level rawData: extra data to notify with error \(can be context.Context, Tags, or any other data\) when rawData is context.Context, it will used to get extra data from loggers.FromContext\(ctx\) and tags from metadata
+
+## func [NotifyWithLevelAndSkip](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L185>)
 
 ```go
 func NotifyWithLevelAndSkip(err error, skip int, level string, rawData ...interface{}) error
 ```
 
-## func [SetEnvironment](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L354>)
+NotifyWithLevelAndSkip notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored err: error to notify skip: skip stack frames when notify error level: error level rawData: extra data to notify with error \(can be context.Context, Tags, or any other data\) when rawData is context.Context, it will used to get extra data from loggers.FromContext\(ctx\) and tags from metadata
+
+## func [SetEnvironment](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L384>)
 
 ```go
 func SetEnvironment(env string)
 ```
 
-## func [SetHostname](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L423>)
+SetEnvironment sets the environment. The environment is used to distinguish errors occurring in different
+
+## func [SetHostname](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L469>)
 
 ```go
 func SetHostname(name string)
 ```
 
-## func [SetRelease](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L365>)
+SetHostname sets the hostname of the server. The hostname is used to identify the server that logged an error.
+
+## func [SetRelease](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L397>)
 
 ```go
 func SetRelease(rel string)
 ```
 
-## func [SetServerRoot](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L419>)
+SetRelease sets the release tag. The release tag is used to group errors together by release.
+
+## func [SetServerRoot](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L463>)
 
 ```go
 func SetServerRoot(path string)
 ```
+
+SetServerRoot sets the root directory of the project. The root directory is used to trim prefixes from filenames in stack traces.
 
 ## func [SetTraceHeaderName](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L38>)
 
@@ -142,23 +157,25 @@ func SetServerRoot(path string)
 func SetTraceHeaderName(name string)
 ```
 
-## func [SetTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L370>)
+SetTraceHeaderName sets the header name for trace id default is x\-trace\-id
+
+## func [SetTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L404>)
 
 ```go
 func SetTraceId(ctx context.Context) context.Context
 ```
 
-SetTraceId updates the traceID based on context values
+SetTraceId updates the traceID based on context values if no trace id is found then it will create one and update the context You should use the context returned by this function instead of the one passed
 
-## func [UpdateTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L411>)
+## func [UpdateTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L453>)
 
 ```go
 func UpdateTraceId(ctx context.Context, traceID string) context.Context
 ```
 
-UpdateTraceId force updates the traced id to provided id
+UpdateTraceId force updates the traced id to provided id if no trace id is found then it will create one and update the context You should use the context returned by this function instead of the one passed
 
-## type [Tags](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L51>)
+## type [Tags](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L53>)
 
 ```go
 type Tags map[string]string

@@ -8,10 +8,9 @@
 import "github.com/go-coldbrew/errors"
 ```
 
-Package errors provides an implementation of golang error with stack strace information attached to it\, the error objects created by this package are compatible with https://golang.org/pkg/errors/
+Package errors provides an implementation of golang error with stack strace information attached to it, the error objects created by this package are compatible with https://golang.org/pkg/errors/
 
 ### How To Use
-
 The simplest way to use this package is by calling one of the two functions
 
 ```
@@ -19,7 +18,22 @@ errors.New(...)
 errors.Wrap(...)
 ```
 
-You can also initialize custom error stack by using one of the \`WithSkip\` functions\. \`WithSkip\` allows skipping the defined number of functions from the stack information\.
+You can also initialize custom error stack by using one of the \`WithSkip\` functions. \`WithSkip\` allows skipping the defined number of functions from the stack information.
+
+```
+if you want to create a new error use New
+if you want to skip some functions on the stack use NewWithSkip
+if you want to add GRPC status use NewWithStatus
+if you want to skip some functions on the stack and add GRPC status use NewWithSkipAndStatus
+if you want to wrap an existing error use Wrap
+if you want to wrap an existing error and add GRPC status use WrapWithStatus
+if you want to wrap an existing error and skip some functions on the stack use WrapWithSkip
+if you want to wrap an existing error, skip some functions on the stack and add GRPC status use WrapWithSkipAndStatus
+if you want to wrap an existing error and add notifier options use WrapWithNotifier
+if you want to wrap an existing error, skip some functions on the stack and add notifier options use WrapWithSkipAndNotifier
+```
+
+Head to https://docs.coldbrew.cloud for more information.
 
 ## Index
 
@@ -37,7 +51,7 @@ You can also initialize custom error stack by using one of the \`WithSkip\` func
 - [type StackFrame](<#type-stackframe>)
 
 
-## func [SetBaseFilePath](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L221>)
+## func [SetBaseFilePath](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L227>)
 
 ```go
 func SetBaseFilePath(path string)
@@ -45,13 +59,16 @@ func SetBaseFilePath(path string)
 
 SetBaseFilePath sets the base file path for linking source code with reported stack information
 
-## type [ErrorExt](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L24-L32>)
+## type [ErrorExt](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L24-L35>)
 
-ErrorExt is the interface that defines a error\, any ErrorExt implementors can use and override errors and notifier package
+ErrorExt is the interface that defines a error, any ErrorExt implementors can use and override errors and notifier package
 
 ```go
 type ErrorExt interface {
+
+    // Callers returns the call poiners for the stack
     Callers() []uintptr
+    // StackFrame returns the stack frame for the error
     StackFrame() []StackFrame
     //Cause returns the original error object that caused this error
     Cause() error
@@ -61,7 +78,7 @@ type ErrorExt interface {
 }
 ```
 
-### func [New](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L141>)
+### func [New](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L147>)
 
 ```go
 func New(msg string) ErrorExt
@@ -69,7 +86,7 @@ func New(msg string) ErrorExt
 
 New creates a new error with stack information
 
-### func [NewWithSkip](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L151>)
+### func [NewWithSkip](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L157>)
 
 ```go
 func NewWithSkip(msg string, skip int) ErrorExt
@@ -77,7 +94,7 @@ func NewWithSkip(msg string, skip int) ErrorExt
 
 NewWithSkip creates a new error skipping the number of function on the stack
 
-### func [NewWithSkipAndStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L156>)
+### func [NewWithSkipAndStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L162>)
 
 ```go
 func NewWithSkipAndStatus(msg string, skip int, status *grpcstatus.Status) ErrorExt
@@ -85,7 +102,7 @@ func NewWithSkipAndStatus(msg string, skip int, status *grpcstatus.Status) Error
 
 NewWithSkipAndStatus creates a new error skipping the number of function on the stack and GRPC status
 
-### func [NewWithStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L146>)
+### func [NewWithStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L152>)
 
 ```go
 func NewWithStatus(msg string, status *grpcstatus.Status) ErrorExt
@@ -93,7 +110,7 @@ func NewWithStatus(msg string, status *grpcstatus.Status) ErrorExt
 
 NewWithStatus creates a new error with statck information and GRPC status
 
-### func [Wrap](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L161>)
+### func [Wrap](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L167>)
 
 ```go
 func Wrap(err error, msg string) ErrorExt
@@ -101,7 +118,7 @@ func Wrap(err error, msg string) ErrorExt
 
 Wrap wraps an existing error and appends stack information if it does not exists
 
-### func [WrapWithSkip](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L171>)
+### func [WrapWithSkip](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L177>)
 
 ```go
 func WrapWithSkip(err error, msg string, skip int) ErrorExt
@@ -109,7 +126,7 @@ func WrapWithSkip(err error, msg string, skip int) ErrorExt
 
 WrapWithSkip wraps an existing error and appends stack information if it does not exists skipping the number of function on the stack
 
-### func [WrapWithSkipAndStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L176>)
+### func [WrapWithSkipAndStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L182>)
 
 ```go
 func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.Status) ErrorExt
@@ -117,7 +134,7 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 
 WrapWithSkip wraps an existing error and appends stack information if it does not exists skipping the number of function on the stack along with GRPC status
 
-### func [WrapWithStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L166>)
+### func [WrapWithStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L172>)
 
 ```go
 func WrapWithStatus(err error, msg string, status *grpcstatus.Status) ErrorExt
@@ -125,13 +142,15 @@ func WrapWithStatus(err error, msg string, status *grpcstatus.Status) ErrorExt
 
 Wrap wraps an existing error and appends stack information if it does not exists along with GRPC status
 
-## type [NotifyExt](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L35-L38>)
+## type [NotifyExt](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L38-L43>)
 
 NotifyExt is the interface definition for notifier related options
 
 ```go
 type NotifyExt interface {
+    // ShouldNotify returns true if the error should be notified
     ShouldNotify() bool
+    // Notified sets the error to be notified or not
     Notified(status bool)
 }
 ```

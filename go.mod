@@ -12,4 +12,5 @@ require (
 	github.com/stvp/rollbar v0.5.1
 	google.golang.org/grpc v1.40.0
 	gopkg.in/airbrake/gobrake.v2 v2.0.9
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
