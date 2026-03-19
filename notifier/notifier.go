@@ -134,8 +134,8 @@ func convToSentry(in errors.ErrorExt) *raven.Stacktrace {
 }
 
 // parseRawData parses raw data to extra data and tags
-func parseRawData(ctx context.Context, rawData ...interface{}) (extraData map[string]interface{}, tagData []map[string]string) {
-	extraData = make(map[string]interface{})
+func parseRawData(ctx context.Context, rawData ...any) (extraData map[string]any, tagData []map[string]string) {
+	extraData = make(map[string]any)
 
 	for pos := range rawData {
 		data := rawData[pos]
@@ -149,7 +149,7 @@ func parseRawData(ctx context.Context, rawData ...interface{}) (extraData map[st
 		}
 	}
 	if logFields := loggers.FromContext(ctx); logFields != nil {
-		logFields.Range(func(k, v interface{}) bool {
+		logFields.Range(func(k, v any) bool {
 			if str, ok := k.(string); ok {
 				extraData[str] = v
 			}
@@ -163,7 +163,7 @@ func parseRawData(ctx context.Context, rawData ...interface{}) (extraData map[st
 // err: error to notify
 // rawData: extra data to notify with error (can be context.Context, Tags, or any other data)
 // when rawData is context.Context, it will used to get extra data from loggers.FromContext(ctx) and tags from metadata
-func Notify(err error, rawData ...interface{}) error {
+func Notify(err error, rawData ...any) error {
 	return NotifyWithLevelAndSkip(err, 2, rollbar.ERR, rawData...)
 }
 
@@ -172,7 +172,7 @@ func Notify(err error, rawData ...interface{}) error {
 // level: error level
 // rawData: extra data to notify with error (can be context.Context, Tags, or any other data)
 // when rawData is context.Context, it will used to get extra data from loggers.FromContext(ctx) and tags from metadata
-func NotifyWithLevel(err error, level string, rawData ...interface{}) error {
+func NotifyWithLevel(err error, level string, rawData ...any) error {
 	return NotifyWithLevelAndSkip(err, 2, level, rawData...)
 }
 
@@ -182,7 +182,7 @@ func NotifyWithLevel(err error, level string, rawData ...interface{}) error {
 // level: error level
 // rawData: extra data to notify with error (can be context.Context, Tags, or any other data)
 // when rawData is context.Context, it will used to get extra data from loggers.FromContext(ctx) and tags from metadata
-func NotifyWithLevelAndSkip(err error, skip int, level string, rawData ...interface{}) error {
+func NotifyWithLevelAndSkip(err error, skip int, level string, rawData ...any) error {
 	if err == nil {
 		return nil
 	}
@@ -197,7 +197,7 @@ func NotifyWithLevelAndSkip(err error, skip int, level string, rawData ...interf
 
 }
 
-func doNotify(err error, skip int, level string, rawData ...interface{}) error {
+func doNotify(err error, skip int, level string, rawData ...any) error {
 	if err == nil {
 		return nil
 	}
@@ -208,7 +208,7 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 		errWithStack = errors.WrapWithSkip(err, "", skip+1)
 	}
 
-	list := make([]interface{}, 0)
+	list := make([]any, 0)
 	for pos := range rawData {
 		data := rawData[pos]
 		// if we find the error, return error and do not log it
@@ -268,7 +268,7 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 		if traceID != "" {
 			fields = append(fields, &rollbar.Field{Name: "traceId", Data: traceID})
 		}
-		fields = append(fields, &rollbar.Field{Name: "server", Data: map[string]interface{}{"hostname": getHostname(), "root": getServerRoot()}})
+		fields = append(fields, &rollbar.Field{Name: "server", Data: map[string]any{"hostname": getHostname(), "root": getServerRoot()}})
 		rollbar.ErrorWithStack(level, errWithStack, convToRollbar(errWithStack.StackFrame()), fields...)
 	}
 
@@ -298,12 +298,12 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 // err: error to notify
 // rawData: extra data to notify with error (can be context.Context, Tags, or any other data)
 // when rawData is context.Context, it will used to get extra data from loggers.FromContext(ctx) and tags from metadata
-func NotifyWithExclude(err error, rawData ...interface{}) error {
+func NotifyWithExclude(err error, rawData ...any) error {
 	if err == nil {
 		return nil
 	}
 
-	list := make([]interface{}, 0)
+	list := make([]any, 0)
 	for pos := range rawData {
 		data := rawData[pos]
 		// if we find the error, return error and do not log it
@@ -329,7 +329,7 @@ func NotifyWithExclude(err error, rawData ...interface{}) error {
 // this function should be called in defer
 // example: defer NotifyOnPanic(ctx, "some data")
 // example: defer NotifyOnPanic(ctx, "some data", Tags{"tag1": "value1"})
-func NotifyOnPanic(rawData ...interface{}) {
+func NotifyOnPanic(rawData ...any) {
 	if airbrake != nil {
 		defer airbrake.NotifyOnPanic()
 	}
