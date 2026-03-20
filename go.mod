@@ -1,6 +1,6 @@
 module github.com/go-coldbrew/errors
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/getsentry/raven-go v0.2.0
