@@ -2,6 +2,8 @@
 
 [![GoDoc](https://img.shields.io/badge/pkg.go.dev-doc-blue)](http://pkg.go.dev/github.com/go-coldbrew/errors)
 
+
+
 # errors
 
 ```go
@@ -10,8 +12,7 @@ import "github.com/go-coldbrew/errors"
 
 Package errors provides an implementation of golang error with stack strace information attached to it, the error objects created by this package are compatible with https://golang.org/pkg/errors/
 
-### How To Use
-The simplest way to use this package is by calling one of the two functions
+How To Use The simplest way to use this package is by calling one of the two functions
 
 ```
 errors.New(...)
@@ -37,20 +38,21 @@ Head to https://docs.coldbrew.cloud for more information.
 
 ## Index
 
-- [func SetBaseFilePath(path string)](<#func-setbasefilepath>)
-- [type ErrorExt](<#type-errorext>)
-  - [func New(msg string) ErrorExt](<#func-new>)
-  - [func NewWithSkip(msg string, skip int) ErrorExt](<#func-newwithskip>)
-  - [func NewWithSkipAndStatus(msg string, skip int, status *grpcstatus.Status) ErrorExt](<#func-newwithskipandstatus>)
-  - [func NewWithStatus(msg string, status *grpcstatus.Status) ErrorExt](<#func-newwithstatus>)
-  - [func Wrap(err error, msg string) ErrorExt](<#func-wrap>)
-  - [func WrapWithSkip(err error, msg string, skip int) ErrorExt](<#func-wrapwithskip>)
-  - [func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.Status) ErrorExt](<#func-wrapwithskipandstatus>)
-  - [func WrapWithStatus(err error, msg string, status *grpcstatus.Status) ErrorExt](<#func-wrapwithstatus>)
-- [type NotifyExt](<#type-notifyext>)
-- [type StackFrame](<#type-stackframe>)
+- [func SetBaseFilePath\(path string\)](<#SetBaseFilePath>)
+- [type ErrorExt](<#ErrorExt>)
+  - [func New\(msg string\) ErrorExt](<#New>)
+  - [func NewWithSkip\(msg string, skip int\) ErrorExt](<#NewWithSkip>)
+  - [func NewWithSkipAndStatus\(msg string, skip int, status \*grpcstatus.Status\) ErrorExt](<#NewWithSkipAndStatus>)
+  - [func NewWithStatus\(msg string, status \*grpcstatus.Status\) ErrorExt](<#NewWithStatus>)
+  - [func Wrap\(err error, msg string\) ErrorExt](<#Wrap>)
+  - [func WrapWithSkip\(err error, msg string, skip int\) ErrorExt](<#WrapWithSkip>)
+  - [func WrapWithSkipAndStatus\(err error, msg string, skip int, status \*grpcstatus.Status\) ErrorExt](<#WrapWithSkipAndStatus>)
+  - [func WrapWithStatus\(err error, msg string, status \*grpcstatus.Status\) ErrorExt](<#WrapWithStatus>)
+- [type NotifyExt](<#NotifyExt>)
+- [type StackFrame](<#StackFrame>)
 
 
+<a name="SetBaseFilePath"></a>
 ## func [SetBaseFilePath](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L227>)
 
 ```go
@@ -59,6 +61,7 @@ func SetBaseFilePath(path string)
 
 SetBaseFilePath sets the base file path for linking source code with reported stack information
 
+<a name="ErrorExt"></a>
 ## type [ErrorExt](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L24-L35>)
 
 ErrorExt is the interface that defines a error, any ErrorExt implementors can use and override errors and notifier package
@@ -78,6 +81,7 @@ type ErrorExt interface {
 }
 ```
 
+<a name="New"></a>
 ### func [New](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L147>)
 
 ```go
@@ -86,6 +90,7 @@ func New(msg string) ErrorExt
 
 New creates a new error with stack information
 
+<a name="NewWithSkip"></a>
 ### func [NewWithSkip](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L157>)
 
 ```go
@@ -94,6 +99,7 @@ func NewWithSkip(msg string, skip int) ErrorExt
 
 NewWithSkip creates a new error skipping the number of function on the stack
 
+<a name="NewWithSkipAndStatus"></a>
 ### func [NewWithSkipAndStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L162>)
 
 ```go
@@ -102,6 +108,7 @@ func NewWithSkipAndStatus(msg string, skip int, status *grpcstatus.Status) Error
 
 NewWithSkipAndStatus creates a new error skipping the number of function on the stack and GRPC status
 
+<a name="NewWithStatus"></a>
 ### func [NewWithStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L152>)
 
 ```go
@@ -110,6 +117,7 @@ func NewWithStatus(msg string, status *grpcstatus.Status) ErrorExt
 
 NewWithStatus creates a new error with statck information and GRPC status
 
+<a name="Wrap"></a>
 ### func [Wrap](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L167>)
 
 ```go
@@ -118,6 +126,7 @@ func Wrap(err error, msg string) ErrorExt
 
 Wrap wraps an existing error and appends stack information if it does not exists
 
+<a name="WrapWithSkip"></a>
 ### func [WrapWithSkip](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L177>)
 
 ```go
@@ -126,6 +135,7 @@ func WrapWithSkip(err error, msg string, skip int) ErrorExt
 
 WrapWithSkip wraps an existing error and appends stack information if it does not exists skipping the number of function on the stack
 
+<a name="WrapWithSkipAndStatus"></a>
 ### func [WrapWithSkipAndStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L182>)
 
 ```go
@@ -134,6 +144,7 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 
 WrapWithSkip wraps an existing error and appends stack information if it does not exists skipping the number of function on the stack along with GRPC status
 
+<a name="WrapWithStatus"></a>
 ### func [WrapWithStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L172>)
 
 ```go
@@ -142,6 +153,7 @@ func WrapWithStatus(err error, msg string, status *grpcstatus.Status) ErrorExt
 
 Wrap wraps an existing error and appends stack information if it does not exists along with GRPC status
 
+<a name="NotifyExt"></a>
 ## type [NotifyExt](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L38-L43>)
 
 NotifyExt is the interface definition for notifier related options
@@ -155,6 +167,7 @@ type NotifyExt interface {
 }
 ```
 
+<a name="StackFrame"></a>
 ## type [StackFrame](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L17-L21>)
 
 StackFrame represents the stackframe for tracing exception
@@ -166,7 +179,5 @@ type StackFrame struct {
     Func string `json:"function"`
 }
 ```
-
-
 
 Generated by [gomarkdoc](<https://github.com/princjef/gomarkdoc>)
