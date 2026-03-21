@@ -77,6 +77,7 @@ func InitRollbar(token, env string) {
 // InitSentry inits sentry configuration
 // dsn: sentry dsn
 func InitSentry(dsn string) {
+	sentryInited = false
 	if err := raven.SetDSN(dsn); err != nil {
 		log.Error(context.Background(), "msg", "failed to set sentry DSN", "err", err)
 		return
