@@ -77,7 +77,10 @@ func InitRollbar(token, env string) {
 // InitSentry inits sentry configuration
 // dsn: sentry dsn
 func InitSentry(dsn string) {
-	raven.SetDSN(dsn)
+	if err := raven.SetDSN(dsn); err != nil {
+		log.Error(context.Background(), "msg", "failed to set sentry DSN", "err", err)
+		return
+	}
 	sentryInited = true
 }
 
@@ -242,8 +245,7 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 	}
 
 	if airbrake != nil {
-		var n *gobrake.Notice
-		n = gobrake.NewNotice(errWithStack, nil, 1)
+		n := gobrake.NewNotice(errWithStack, nil, 1)
 		n.Errors[0].Backtrace = convToGoBrake(errWithStack.StackFrame())
 		if len(list) > 0 {
 			m, _ := parseRawData(ctx, list...)
@@ -273,11 +275,14 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 	}
 
 	if sentryInited {
-		defLevel := raven.ERROR
-		if level == "critical" {
+		var defLevel raven.Severity
+		switch level {
+		case "critical":
 			defLevel = raven.FATAL
-		} else if level == "warning" {
+		case "warning":
 			defLevel = raven.WARNING
+		default:
+			defLevel = raven.ERROR
 		}
 		ravenExp := raven.NewException(errWithStack, convToSentry(errWithStack))
 		packet := raven.NewPacketWithExtra(errWithStack.Error(), parsedData, ravenExp)
@@ -319,7 +324,7 @@ func NotifyWithExclude(err error, rawData ...interface{}) error {
 			list = append(list, rawData[pos])
 		}
 	}
-	go Notify(err, list...)
+	go func() { _ = Notify(err, list...) }()
 	return err
 }
 

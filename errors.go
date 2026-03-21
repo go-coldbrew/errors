@@ -1,7 +1,7 @@
 package errors
 
 import (
-	"fmt"
+	stderrors "errors"
 	"runtime"
 	"strings"
 
@@ -155,12 +155,12 @@ func NewWithStatus(msg string, status *grpcstatus.Status) ErrorExt {
 
 // NewWithSkip creates a new error skipping the number of function on the stack
 func NewWithSkip(msg string, skip int) ErrorExt {
-	return WrapWithSkip(fmt.Errorf(msg), "", skip+1)
+	return WrapWithSkip(stderrors.New(msg), "", skip+1)
 }
 
 // NewWithSkipAndStatus creates a new error skipping the number of function on the stack and GRPC status
 func NewWithSkipAndStatus(msg string, skip int, status *grpcstatus.Status) ErrorExt {
-	return WrapWithSkipAndStatus(fmt.Errorf(msg), "", skip+1, status)
+	return WrapWithSkipAndStatus(stderrors.New(msg), "", skip+1, status)
 }
 
 // Wrap wraps an existing error and appends stack information if it does not exists
