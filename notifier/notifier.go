@@ -56,12 +56,13 @@ func NotifyAsync(err error, rawData ...interface{}) error {
 	if err == nil {
 		return nil
 	}
+	sem := asyncSem
 	select {
-	case asyncSem <- struct{}{}:
-		go func() {
-			defer func() { <-asyncSem }()
+	case sem <- struct{}{}:
+		go func(s chan struct{}) {
+			defer func() { <-s }()
 			_ = Notify(err, rawData...)
-		}()
+		}(sem)
 	default:
 		// drop notification to prevent goroutine explosion
 	}
