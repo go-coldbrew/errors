@@ -2,6 +2,7 @@ package errors
 
 import (
 	stderrors "errors"
+	"fmt"
 	"runtime"
 	"strings"
 
@@ -10,7 +11,8 @@ import (
 )
 
 var (
-	basePath = ""
+	basePath      = ""
+	maxStackDepth = 64
 )
 
 // StackFrame represents the stackframe for tracing exception
@@ -47,41 +49,47 @@ type customError struct {
 	stack        []uintptr
 	frame        []StackFrame
 	cause        error
+	wrapped      error // immediate parent for Unwrap() chain; may differ from cause
 	shouldNotify bool
 	status       *grpcstatus.Status
 }
 
-// implements notifier.NotifyExt
+// ShouldNotify returns true if the error should be reported to notifiers.
 func (c *customError) ShouldNotify() bool {
 	return c.shouldNotify
 }
 
-// implements notifier.NotifyExt
+// Notified marks the error as having been notified (or not).
 func (c *customError) Notified(status bool) {
 	c.shouldNotify = !status
 }
 
-// implements error
+// Error returns the error message.
 func (c customError) Error() string {
 	return c.Msg
 }
 
+// Callers returns the program counters of the call stack when the error was created.
 func (c customError) Callers() []uintptr {
 	return c.stack[:]
 }
 
+// StackTrace returns the program counters of the call stack (alias for Callers).
 func (c customError) StackTrace() []uintptr {
 	return c.Callers()
 }
 
+// StackFrame returns the structured stack frames for the error.
 func (c customError) StackFrame() []StackFrame {
 	return c.frame
 }
 
+// Cause returns the root cause error that originated this error chain.
 func (c customError) Cause() error {
 	return c.cause
 }
 
+// GRPCStatus returns the gRPC status for this error.
 func (c customError) GRPCStatus() *grpcstatus.Status {
 	if c.status != nil {
 		// use latest error message and keep other data (e.g. details)
@@ -97,7 +105,7 @@ func (c customError) GRPCStatus() *grpcstatus.Status {
 func (c *customError) generateStack(skip int) []StackFrame {
 	stack := []StackFrame{}
 	trace := []uintptr{}
-	for i := skip + 1; ; i++ {
+	for i := skip + 1; i < skip+1+maxStackDepth; i++ {
 		pc, file, line, ok := runtime.Caller(i)
 		if !ok {
 			break
@@ -118,8 +126,9 @@ func (c *customError) generateStack(skip int) []StackFrame {
 	return stack
 }
 
+// Unwrap returns the immediate parent error for use with errors.Is and errors.As.
 func (c customError) Unwrap() error {
-	return c.cause
+	return c.wrapped
 }
 
 func packageFuncName(pc uintptr) (string, string) {
@@ -199,9 +208,11 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 	//if we have stack information reuse that
 	if e, ok := err.(ErrorExt); ok {
 		c := &customError{
-			Msg:    msg + e.Error(),
-			cause:  e.Cause(),
-			status: status,
+			Msg:          msg + e.Error(),
+			cause:        e.Cause(),
+			wrapped:      err, // preserve full chain for errors.Is/errors.As
+			status:       status,
+			shouldNotify: true,
 		}
 
 		c.stack = e.Callers()
@@ -215,12 +226,31 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 	c := &customError{
 		Msg:          msg + err.Error(),
 		cause:        err,
+		wrapped:      err,
 		shouldNotify: true,
 		status:       status,
 	}
 	c.generateStack(skip + 1)
 	return c
 
+}
+
+// SetMaxStackDepth sets the maximum number of stack frames captured when creating errors.
+// Default is 64. Must be called during initialization.
+func SetMaxStackDepth(n int) {
+	if n > 0 {
+		maxStackDepth = n
+	}
+}
+
+// Newf creates a new error with a formatted message and stack information
+func Newf(format string, args ...any) ErrorExt {
+	return NewWithSkip(fmt.Sprintf(format, args...), 1)
+}
+
+// Wrapf wraps an existing error with a formatted message and appends stack information if it does not exist
+func Wrapf(err error, format string, args ...any) ErrorExt {
+	return WrapWithSkip(err, fmt.Sprintf(format, args...), 1)
 }
 
 // SetBaseFilePath sets the base file path for linking source code with reported stack information

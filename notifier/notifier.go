@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	raven "github.com/getsentry/raven-go"
 	"github.com/go-coldbrew/errors"
@@ -27,11 +28,53 @@ var (
 	serverRoot    string
 	hostname      string
 	traceHeader   string = "x-trace-id"
+
+	// asyncSem is a semaphore that bounds the number of concurrent async
+	// notification goroutines. When full, new notifications are dropped
+	// to prevent goroutine explosion under sustained error bursts.
+	asyncSem = make(chan struct{}, 1000)
 )
 
 const (
 	tracerID = "tracerId"
 )
+
+var asyncSemOnce sync.Once
+
+// SetMaxAsyncNotifications sets the maximum number of concurrent async
+// notification goroutines. When the limit is reached, new async notifications
+// are dropped to prevent goroutine explosion under sustained error bursts.
+// Default is 1000. Can only be called once; subsequent calls are no-ops.
+func SetMaxAsyncNotifications(n int) {
+	if n > 0 {
+		asyncSemOnce.Do(func() {
+			asyncSem = make(chan struct{}, n)
+		})
+	}
+}
+
+// NotifyAsync sends an error notification asynchronously with bounded concurrency.
+// If the async notification pool is full, the notification is dropped to prevent
+// goroutine explosion under sustained error bursts.
+// Returns the original error for convenience.
+func NotifyAsync(err error, rawData ...interface{}) error {
+	if err == nil {
+		return nil
+	}
+	sem := asyncSem
+	select {
+	case sem <- struct{}{}:
+		data := append([]interface{}(nil), rawData...)
+		go func(s chan struct{}, d []interface{}) {
+			defer func() { <-s }()
+			_ = Notify(err, d...)
+		}(sem, data)
+	default:
+		// drop notification to prevent goroutine explosion
+		log.Debug(context.Background(), "msg", "async notification dropped due to capacity", "err", err)
+	}
+	return err
+}
 
 // SetTraceHeaderName sets the header name for trace id
 // default is x-trace-id
@@ -325,7 +368,7 @@ func NotifyWithExclude(err error, rawData ...interface{}) error {
 			list = append(list, rawData[pos])
 		}
 	}
-	go func() { _ = Notify(err, list...) }()
+	_ = NotifyAsync(err, list...)
 	return err
 }
 
