@@ -202,10 +202,11 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 	//if we have stack information reuse that
 	if e, ok := err.(ErrorExt); ok {
 		c := &customError{
-			Msg:     msg + e.Error(),
-			cause:   e.Cause(),
-			wrapped: err, // preserve full chain for errors.Is/errors.As
-			status:  status,
+			Msg:          msg + e.Error(),
+			cause:        e.Cause(),
+			wrapped:      err, // preserve full chain for errors.Is/errors.As
+			status:       status,
+			shouldNotify: true,
 		}
 
 		c.stack = e.Callers()
