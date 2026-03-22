@@ -2,6 +2,7 @@ package errors
 
 import (
 	stderrors "errors"
+	"fmt"
 	"runtime"
 	"strings"
 
@@ -10,7 +11,8 @@ import (
 )
 
 var (
-	basePath = ""
+	basePath      = ""
+	maxStackDepth = 64
 )
 
 // StackFrame represents the stackframe for tracing exception
@@ -47,6 +49,7 @@ type customError struct {
 	stack        []uintptr
 	frame        []StackFrame
 	cause        error
+	wrapped      error // immediate parent for Unwrap() chain; may differ from cause
 	shouldNotify bool
 	status       *grpcstatus.Status
 }
@@ -97,7 +100,7 @@ func (c customError) GRPCStatus() *grpcstatus.Status {
 func (c *customError) generateStack(skip int) []StackFrame {
 	stack := []StackFrame{}
 	trace := []uintptr{}
-	for i := skip + 1; ; i++ {
+	for i := skip + 1; i < skip+1+maxStackDepth; i++ {
 		pc, file, line, ok := runtime.Caller(i)
 		if !ok {
 			break
@@ -119,7 +122,7 @@ func (c *customError) generateStack(skip int) []StackFrame {
 }
 
 func (c customError) Unwrap() error {
-	return c.cause
+	return c.wrapped
 }
 
 func packageFuncName(pc uintptr) (string, string) {
@@ -199,9 +202,10 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 	//if we have stack information reuse that
 	if e, ok := err.(ErrorExt); ok {
 		c := &customError{
-			Msg:    msg + e.Error(),
-			cause:  e.Cause(),
-			status: status,
+			Msg:     msg + e.Error(),
+			cause:   e.Cause(),
+			wrapped: err, // preserve full chain for errors.Is/errors.As
+			status:  status,
 		}
 
 		c.stack = e.Callers()
@@ -215,12 +219,31 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 	c := &customError{
 		Msg:          msg + err.Error(),
 		cause:        err,
+		wrapped:      err,
 		shouldNotify: true,
 		status:       status,
 	}
 	c.generateStack(skip + 1)
 	return c
 
+}
+
+// SetMaxStackDepth sets the maximum number of stack frames captured when creating errors.
+// Default is 64. Must be called during initialization.
+func SetMaxStackDepth(n int) {
+	if n > 0 {
+		maxStackDepth = n
+	}
+}
+
+// Newf creates a new error with a formatted message and stack information
+func Newf(format string, args ...any) ErrorExt {
+	return NewWithSkip(fmt.Sprintf(format, args...), 1)
+}
+
+// Wrapf wraps an existing error with a formatted message and appends stack information if it does not exist
+func Wrapf(err error, format string, args ...any) ErrorExt {
+	return WrapWithSkip(err, fmt.Sprintf(format, args...), 1)
 }
 
 // SetBaseFilePath sets the base file path for linking source code with reported stack information

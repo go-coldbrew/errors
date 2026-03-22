@@ -27,11 +27,46 @@ var (
 	serverRoot    string
 	hostname      string
 	traceHeader   string = "x-trace-id"
+
+	// asyncSem is a semaphore that bounds the number of concurrent async
+	// notification goroutines. When full, new notifications are dropped
+	// to prevent goroutine explosion under sustained error bursts.
+	asyncSem = make(chan struct{}, 1000)
 )
 
 const (
 	tracerID = "tracerId"
 )
+
+// SetMaxAsyncNotifications sets the maximum number of concurrent async
+// notification goroutines. When the limit is reached, new async notifications
+// are dropped to prevent goroutine explosion under sustained error bursts.
+// Default is 1000. Must be called during initialization.
+func SetMaxAsyncNotifications(n int) {
+	if n > 0 {
+		asyncSem = make(chan struct{}, n)
+	}
+}
+
+// NotifyAsync sends an error notification asynchronously with bounded concurrency.
+// If the async notification pool is full, the notification is dropped to prevent
+// goroutine explosion under sustained error bursts.
+// Returns the original error for convenience.
+func NotifyAsync(err error, rawData ...interface{}) error {
+	if err == nil {
+		return nil
+	}
+	select {
+	case asyncSem <- struct{}{}:
+		go func() {
+			defer func() { <-asyncSem }()
+			_ = Notify(err, rawData...)
+		}()
+	default:
+		// drop notification to prevent goroutine explosion
+	}
+	return err
+}
 
 // SetTraceHeaderName sets the header name for trace id
 // default is x-trace-id
@@ -325,7 +360,7 @@ func NotifyWithExclude(err error, rawData ...interface{}) error {
 			list = append(list, rawData[pos])
 		}
 	}
-	go func() { _ = Notify(err, list...) }()
+	_ = NotifyAsync(err, list...)
 	return err
 }
 
