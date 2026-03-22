@@ -54,37 +54,42 @@ type customError struct {
 	status       *grpcstatus.Status
 }
 
-// implements notifier.NotifyExt
+// ShouldNotify returns true if the error should be reported to notifiers.
 func (c *customError) ShouldNotify() bool {
 	return c.shouldNotify
 }
 
-// implements notifier.NotifyExt
+// Notified marks the error as having been notified (or not).
 func (c *customError) Notified(status bool) {
 	c.shouldNotify = !status
 }
 
-// implements error
+// Error returns the error message.
 func (c customError) Error() string {
 	return c.Msg
 }
 
+// Callers returns the program counters of the call stack when the error was created.
 func (c customError) Callers() []uintptr {
 	return c.stack[:]
 }
 
+// StackTrace returns the program counters of the call stack (alias for Callers).
 func (c customError) StackTrace() []uintptr {
 	return c.Callers()
 }
 
+// StackFrame returns the structured stack frames for the error.
 func (c customError) StackFrame() []StackFrame {
 	return c.frame
 }
 
+// Cause returns the root cause error that originated this error chain.
 func (c customError) Cause() error {
 	return c.cause
 }
 
+// GRPCStatus returns the gRPC status for this error.
 func (c customError) GRPCStatus() *grpcstatus.Status {
 	if c.status != nil {
 		// use latest error message and keep other data (e.g. details)
@@ -121,6 +126,7 @@ func (c *customError) generateStack(skip int) []StackFrame {
 	return stack
 }
 
+// Unwrap returns the immediate parent error for use with errors.Is and errors.As.
 func (c customError) Unwrap() error {
 	return c.wrapped
 }

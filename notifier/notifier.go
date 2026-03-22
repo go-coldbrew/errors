@@ -65,6 +65,7 @@ func NotifyAsync(err error, rawData ...interface{}) error {
 		}(sem)
 	default:
 		// drop notification to prevent goroutine explosion
+		log.Debug(context.Background(), "msg", "async notification dropped due to capacity", "err", err)
 	}
 	return err
 }

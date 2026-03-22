@@ -112,3 +112,22 @@ func TestStackDepthCapped(t *testing.T) {
 	}
 }
 
+func TestStackDepthCappedDeep(t *testing.T) {
+	var createDeepError func(depth int) ErrorExt
+	createDeepError = func(depth int) ErrorExt {
+		if depth == 0 {
+			return New("deep error")
+		}
+		return createDeepError(depth - 1)
+	}
+
+	// Create error from a stack deeper than 64
+	err := createDeepError(100)
+	if len(err.StackFrame()) > 64 {
+		t.Errorf("stack depth %d exceeds max 64", len(err.StackFrame()))
+	}
+	if len(err.StackFrame()) == 0 {
+		t.Error("stack should not be empty")
+	}
+}
+
