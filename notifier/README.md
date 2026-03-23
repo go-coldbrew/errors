@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/go-coldbrew/errors/actions/workflows/go.yml/badge.svg)](https://github.com/go-coldbrew/errors/actions/workflows/go.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/go-coldbrew/errors)](https://goreportcard.com/report/github.com/go-coldbrew/errors)
-[![GoDoc](https://pkg.go.dev/badge/github.com/go-coldbrew/errors.svg)](https://pkg.go.dev/github.com/go-coldbrew/errors)
+[![GoDoc](https://pkg.go.dev/badge/github.com/go-coldbrew/errors/notifier.svg)](https://pkg.go.dev/github.com/go-coldbrew/errors/notifier)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 

@@ -39,6 +39,37 @@ if you want to wrap an existing error, skip some functions on the stack and add 
 
 Head to https://docs.coldbrew.cloud for more information.
 
+<details><summary>Example (Stack Frame)</summary>
+<p>
+
+
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/go-coldbrew/errors"
+)
+
+func main() {
+	err := errors.New("something failed")
+	frames := err.StackFrame()
+	// Stack frames are captured automatically
+	fmt.Println(len(frames) > 0)
+}
+```
+
+#### Output
+
+```
+true
+```
+
+</p>
+</details>
+
 ## Index
 
 - [func SetBaseFilePath\(path string\)](<#SetBaseFilePath>)
@@ -96,32 +127,36 @@ type ErrorExt interface {
 }
 ```
 
-<details><summary>Example (3tack Frame)</summary>
+<details><summary>Example (#ause)</summary>
 <p>
 
-
+Cause returns the root cause of a wrapped error chain.
 
 ```go
 package main
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/go-coldbrew/errors"
 )
 
 func main() {
-	err := errors.New("something failed")
-	frames := err.StackFrame()
-	// Stack frames are captured automatically
-	fmt.Println(len(frames) > 0)
+	root := io.EOF
+	first := errors.Wrap(root, "read body")
+	second := errors.Wrap(first, "handle request")
+
+	fmt.Println("error:", second)
+	fmt.Println("cause:", second.Cause())
 }
 ```
 
 #### Output
 
 ```
-true
+error: handle request: read body: EOF
+cause: EOF
 ```
 
 </p>
@@ -331,6 +366,42 @@ func WrapWithStatus(err error, msg string, status *grpcstatus.Status) ErrorExt
 
 Wrap wraps an existing error and appends stack information if it does not exists along with GRPC status
 
+<details><summary>Example</summary>
+<p>
+
+WrapWithStatus attaches a gRPC status code to a wrapped error.
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/go-coldbrew/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+func main() {
+	original := fmt.Errorf("record not found")
+	s := status.New(codes.NotFound, "user not found")
+	wrapped := errors.WrapWithStatus(original, "lookup failed", s)
+
+	fmt.Println(wrapped)
+	fmt.Println("gRPC code:", wrapped.GRPCStatus().Code())
+}
+```
+
+#### Output
+
+```
+lookup failed: record not found
+gRPC code: NotFound
+```
+
+</p>
+</details>
+
 <a name="Wrapf"></a>
 ### func [Wrapf](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L252>)
 
@@ -339,6 +410,36 @@ func Wrapf(err error, format string, args ...any) ErrorExt
 ```
 
 Wrapf wraps an existing error with a formatted message and appends stack information if it does not exist
+
+<details><summary>Example</summary>
+<p>
+
+
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/go-coldbrew/errors"
+)
+
+func main() {
+	err := fmt.Errorf("connection refused")
+	wrapped := errors.Wrapf(err, "failed to connect to port %d", 5432)
+	fmt.Println(wrapped)
+}
+```
+
+#### Output
+
+```
+failed to connect to port 5432: connection refused
+```
+
+</p>
+</details>
 
 <a name="NotifyExt"></a>
 ## type [NotifyExt](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L40-L45>)
