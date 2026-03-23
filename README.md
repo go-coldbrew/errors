@@ -96,6 +96,37 @@ type ErrorExt interface {
 }
 ```
 
+<details><summary>Example (3tack Frame)</summary>
+<p>
+
+
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/go-coldbrew/errors"
+)
+
+func main() {
+	err := errors.New("something failed")
+	frames := err.StackFrame()
+	// Stack frames are captured automatically
+	fmt.Println(len(frames) > 0)
+}
+```
+
+#### Output
+
+```
+true
+```
+
+</p>
+</details>
+
 <a name="New"></a>
 ### func [New](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L156>)
 
@@ -104,6 +135,35 @@ func New(msg string) ErrorExt
 ```
 
 New creates a new error with stack information
+
+<details><summary>Example</summary>
+<p>
+
+
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/go-coldbrew/errors"
+)
+
+func main() {
+	err := errors.New("something went wrong")
+	fmt.Println(err)
+}
+```
+
+#### Output
+
+```
+something went wrong
+```
+
+</p>
+</details>
 
 <a name="NewWithSkip"></a>
 ### func [NewWithSkip](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L166>)
@@ -141,6 +201,35 @@ func Newf(format string, args ...any) ErrorExt
 
 Newf creates a new error with a formatted message and stack information
 
+<details><summary>Example</summary>
+<p>
+
+
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/go-coldbrew/errors"
+)
+
+func main() {
+	err := errors.Newf("user %s not found", "alice")
+	fmt.Println(err)
+}
+```
+
+#### Output
+
+```
+user alice not found
+```
+
+</p>
+</details>
+
 <a name="Wrap"></a>
 ### func [Wrap](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L176>)
 
@@ -149,6 +238,71 @@ func Wrap(err error, msg string) ErrorExt
 ```
 
 Wrap wraps an existing error and appends stack information if it does not exists
+
+<details><summary>Example</summary>
+<p>
+
+
+
+```go
+package main
+
+import (
+	"fmt"
+	"io"
+
+	"github.com/go-coldbrew/errors"
+)
+
+func main() {
+	original := io.EOF
+	wrapped := errors.Wrap(original, "failed to read config")
+	fmt.Println(wrapped)
+	fmt.Println("cause:", wrapped.Cause())
+}
+```
+
+#### Output
+
+```
+failed to read config: EOF
+cause: EOF
+```
+
+</p>
+</details>
+
+<details><summary>Example (Errors Is)</summary>
+<p>
+
+Wrapped errors are compatible with stdlib errors.Is for unwrapping.
+
+```go
+package main
+
+import (
+	stderrors "errors"
+	"fmt"
+	"io"
+
+	"github.com/go-coldbrew/errors"
+)
+
+func main() {
+	original := io.EOF
+	wrapped := errors.Wrap(original, "read failed")
+	fmt.Println(stderrors.Is(wrapped, io.EOF))
+}
+```
+
+#### Output
+
+```
+true
+```
+
+</p>
+</details>
 
 <a name="WrapWithSkip"></a>
 ### func [WrapWithSkip](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L186>)
