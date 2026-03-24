@@ -5,11 +5,19 @@ import (
 	"testing"
 
 	"github.com/go-coldbrew/errors"
+	rollbar "github.com/rollbar/rollbar-go"
 )
 
 func TestInitRollbar(t *testing.T) {
 	rollbarInited = false
-	t.Cleanup(func() { rollbarInited = false })
+	t.Cleanup(func() {
+		rollbarInited = false
+		// Reset rollbar global state to safe defaults.
+		// rollbar-go only exposes setters, not getters, so we can't
+		// snapshot/restore. Setting empty token effectively disables sending.
+		rollbar.SetToken("")
+		rollbar.SetEnvironment("")
+	})
 
 	InitRollbar("test-token", "test")
 	if !rollbarInited {

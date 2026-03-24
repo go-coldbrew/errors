@@ -138,6 +138,9 @@ func InitRollbar(token, env string) {
 					break
 				}
 			}
+			if len(frames) == 0 {
+				return nil, false
+			}
 			return frames, true
 		}
 		return nil, false
