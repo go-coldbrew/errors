@@ -109,8 +109,9 @@ func (tags Tags) value() map[string]string {
 // projectKey: airbrake project key
 func InitAirbrake(projectID int64, projectKey string) {
 	airbrake = gobrake.NewNotifierWithOptions(&gobrake.NotifierOptions{
-		ProjectId:  projectID,
-		ProjectKey: projectKey,
+		ProjectId:   projectID,
+		ProjectKey:  projectKey,
+		Environment: sentryEnvironment,
 	})
 }
 
@@ -120,6 +121,27 @@ func InitAirbrake(projectID int64, projectKey string) {
 func InitRollbar(token, env string) {
 	rollbar.SetToken(token)
 	rollbar.SetEnvironment(env)
+	rollbar.SetStackTracer(func(err error) ([]runtime.Frame, bool) {
+		if ext, ok := err.(errors.ErrorExt); ok {
+			pcs := ext.Callers()
+			if len(pcs) == 0 {
+				return nil, false
+			}
+			frames := make([]runtime.Frame, 0, len(pcs))
+			callersFrames := runtime.CallersFrames(pcs)
+			for {
+				f, more := callersFrames.Next()
+				if f.Function != "" {
+					frames = append(frames, f)
+				}
+				if !more {
+					break
+				}
+			}
+			return frames, true
+		}
+		return nil, false
+	})
 	rollbarInited = true
 }
 

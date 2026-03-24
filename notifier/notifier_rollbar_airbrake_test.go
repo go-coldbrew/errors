@@ -1,6 +1,7 @@
 package notifier
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/go-coldbrew/errors"
@@ -27,23 +28,72 @@ func TestInitAirbrake(t *testing.T) {
 	}
 }
 
-func TestRollbarNotifyDoesNotPanic(t *testing.T) {
-	// Verify the notify path doesn't panic with rollbar disabled.
-	// We avoid initializing rollbar here to prevent data races with
-	// rollbar-go's internal async transport goroutine.
-	rollbarInited = false
-	t.Cleanup(func() { rollbarInited = false })
+func TestInitAirbrakeSeededEnvironment(t *testing.T) {
+	old := airbrake
+	oldEnv := sentryEnvironment
+	t.Cleanup(func() {
+		airbrake = old
+		sentryEnvironment = oldEnv
+	})
 
-	err := errors.New("test rollbar error")
-	Notify(err)
+	sentryEnvironment = "staging"
+	InitAirbrake(12345, "test-key")
+	if airbrake == nil {
+		t.Fatal("expected airbrake notifier to be non-nil")
+	}
 }
 
-func TestRollbarNotifyOnPanicDoesNotPanic(t *testing.T) {
+func TestRollbarStackTracerExtractsErrorExtFrames(t *testing.T) {
+	// Verify that ErrorExt.Callers() can be converted to []runtime.Frame
+	// This is the same logic registered via rollbar.SetStackTracer in InitRollbar.
+	err := errors.New("test error with stack")
+	ext, ok := err.(errors.ErrorExt)
+	if !ok {
+		t.Fatal("expected ErrorExt")
+	}
+
+	pcs := ext.Callers()
+	if len(pcs) == 0 {
+		t.Fatal("expected non-empty callers from ErrorExt")
+	}
+
+	frames := make([]runtime.Frame, 0, len(pcs))
+	callersFrames := runtime.CallersFrames(pcs)
+	for {
+		f, more := callersFrames.Next()
+		if f.Function != "" {
+			frames = append(frames, f)
+		}
+		if !more {
+			break
+		}
+	}
+
+	if len(frames) == 0 {
+		t.Fatal("expected non-empty runtime.Frame slice from ErrorExt callers")
+	}
+
+	// Verify frames contain meaningful data
+	found := false
+	for _, f := range frames {
+		if f.Function != "" && f.File != "" && f.Line > 0 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected at least one frame with Function, File, and Line")
+	}
+}
+
+func TestNotifyOnPanicRecoverable(t *testing.T) {
 	rollbarInited = false
 	t.Cleanup(func() { rollbarInited = false })
 
 	func() {
 		defer func() {
+			// NotifyOnPanic re-panics — verify it's recoverable
+			// and doesn't double-panic
 			recover()
 		}()
 		defer NotifyOnPanic()
@@ -51,11 +101,18 @@ func TestRollbarNotifyOnPanicDoesNotPanic(t *testing.T) {
 	}()
 }
 
+func TestNotifyDoesNotPanicWhenDisabled(t *testing.T) {
+	rollbarInited = false
+	t.Cleanup(func() { rollbarInited = false })
+
+	err := errors.New("test rollbar error")
+	Notify(err)
+}
+
 func TestSetEnvironmentWithAirbrake(t *testing.T) {
 	old := airbrake
 	t.Cleanup(func() { airbrake = old })
 
 	InitAirbrake(12345, "test-key")
-	// Should not panic
 	SetEnvironment("production")
 }
