@@ -8,8 +8,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
-	raven "github.com/getsentry/raven-go"
+	"github.com/getsentry/sentry-go"
 	"github.com/go-coldbrew/errors"
 	"github.com/go-coldbrew/log"
 	"github.com/go-coldbrew/log/loggers"
@@ -22,12 +23,14 @@ import (
 )
 
 var (
-	airbrake      *gobrake.Notifier
-	rollbarInited bool
-	sentryInited  bool
-	serverRoot    string
-	hostname      string
-	traceHeader   string = "x-trace-id"
+	airbrake           *gobrake.Notifier
+	rollbarInited      bool
+	sentryInited       bool
+	sentryEnvironment  string
+	sentryRelease      string
+	serverRoot         string
+	hostname           string
+	traceHeader        string = "x-trace-id"
 
 	// asyncSem is a semaphore that bounds the number of concurrent async
 	// notification goroutines. When full, new notifications are dropped
@@ -121,8 +124,12 @@ func InitRollbar(token, env string) {
 // dsn: sentry dsn
 func InitSentry(dsn string) {
 	sentryInited = false
-	if err := raven.SetDSN(dsn); err != nil {
-		log.Error(context.Background(), "msg", "failed to set sentry DSN", "err", err)
+	if err := sentry.Init(sentry.ClientOptions{
+		Dsn:         dsn,
+		Environment: sentryEnvironment,
+		Release:     sentryRelease,
+	}); err != nil {
+		log.Error(context.Background(), "msg", "failed to init sentry", "err", err)
 		return
 	}
 	sentryInited = true
@@ -152,32 +159,47 @@ func convToRollbar(in []errors.StackFrame) rollbar.Stack {
 	return out
 }
 
-func convToSentry(in errors.ErrorExt) *raven.Stacktrace {
-	out := new(raven.Stacktrace)
+func convToSentry(in errors.ErrorExt) *sentry.Stacktrace {
 	pcs := in.Callers()
-	frames := make([]*raven.StacktraceFrame, 0)
+	frames := make([]sentry.Frame, 0, len(pcs))
 
 	callersFrames := runtime.CallersFrames(pcs)
 
 	for {
 		fr, more := callersFrames.Next()
 		if fr.Func != nil {
-			frame := raven.NewStacktraceFrame(fr.PC, fr.Function, fr.File, fr.Line, 3, []string{})
-			if frame != nil {
-				frame.InApp = true
-				frames = append(frames, frame)
+			module := fr.Function
+			function := fr.Function
+			if idx := strings.LastIndex(fr.Function, "/"); idx != -1 {
+				// Split "github.com/pkg.Func" into module and function
+				rest := fr.Function[idx+1:]
+				if dotIdx := strings.Index(rest, "."); dotIdx != -1 {
+					module = fr.Function[:idx+1+dotIdx]
+					function = rest[dotIdx+1:]
+				}
+			} else if idx := strings.Index(fr.Function, "."); idx != -1 {
+				module = fr.Function[:idx]
+				function = fr.Function[idx+1:]
 			}
+			frames = append(frames, sentry.Frame{
+				Function: function,
+				Module:   module,
+				Filename: fr.File,
+				AbsPath:  fr.File,
+				Lineno:   fr.Line,
+				InApp:    true,
+			})
 		}
 		if !more {
 			break
 		}
 	}
+	// Reverse: sentry expects oldest frame first (bottom of stack)
 	for i := len(frames)/2 - 1; i >= 0; i-- {
 		opp := len(frames) - 1 - i
 		frames[i], frames[opp] = frames[opp], frames[i]
 	}
-	out.Frames = frames
-	return out
+	return &sentry.Stacktrace{Frames: frames}
 }
 
 // parseRawData parses raw data to extra data and tags
@@ -221,6 +243,47 @@ func Notify(err error, rawData ...interface{}) error {
 // when rawData is context.Context, it will used to get extra data from loggers.FromContext(ctx) and tags from metadata
 func NotifyWithLevel(err error, level string, rawData ...interface{}) error {
 	return NotifyWithLevelAndSkip(err, 2, level, rawData...)
+}
+
+func buildSentryEvent(err errors.ErrorExt, level string, extra map[string]interface{}, tagData []map[string]string) *sentry.Event {
+	var sentryLevel sentry.Level
+	switch level {
+	case "critical":
+		sentryLevel = sentry.LevelFatal
+	case "warning":
+		sentryLevel = sentry.LevelWarning
+	default:
+		sentryLevel = sentry.LevelError
+	}
+
+	event := &sentry.Event{
+		Message:     err.Error(),
+		Level:       sentryLevel,
+		Environment: sentryEnvironment,
+		Release:     sentryRelease,
+		Extra:       extra,
+		Exception: []sentry.Exception{
+			{
+				Type:       reflect.TypeOf(err).String(),
+				Value:      err.Error(),
+				Stacktrace: convToSentry(err),
+			},
+		},
+	}
+
+	if len(tagData) > 0 {
+		tags := make(map[string]string)
+		for _, t := range tagData {
+			for k, v := range t {
+				tags[k] = v
+			}
+		}
+		if len(tags) > 0 {
+			event.Tags = tags
+		}
+	}
+
+	return event
 }
 
 // NotifyWithLevelAndSkip notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored
@@ -319,24 +382,8 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 	}
 
 	if sentryInited {
-		var defLevel raven.Severity
-		switch level {
-		case "critical":
-			defLevel = raven.FATAL
-		case "warning":
-			defLevel = raven.WARNING
-		default:
-			defLevel = raven.ERROR
-		}
-		ravenExp := raven.NewException(errWithStack, convToSentry(errWithStack))
-		packet := raven.NewPacketWithExtra(errWithStack.Error(), parsedData, ravenExp)
-
-		for _, tags := range tagData {
-			packet.AddTags(tags)
-		}
-
-		packet.Level = defLevel
-		raven.Capture(packet, nil)
+		event := buildSentryEvent(errWithStack, level, parsedData, tagData)
+		sentry.CaptureEvent(event)
 	}
 
 	log.GetLogger().Log(ctx, loggers.ErrorLevel, skip+1, "err", errWithStack, "stack", errWithStack.StackFrame())
@@ -405,26 +452,23 @@ func NotifyOnPanic(rawData ...interface{}) {
 			rollbar.ErrorWithStack(rollbar.CRIT, e, convToRollbar(e.StackFrame()), &rollbar.Field{Name: "panic", Data: r})
 		}
 		if sentryInited {
-			ravenExp := raven.NewException(e, convToSentry(e))
-			packet := raven.NewPacketWithExtra(e.Error(), parsedData, ravenExp)
-
-			for _, tags := range tagData {
-				packet.AddTags(tags)
-			}
-
-			packet.Level = raven.FATAL
-			raven.Capture(packet, nil)
+			event := buildSentryEvent(e, "critical", parsedData, tagData)
+			sentry.CaptureEvent(event)
 		}
 		panic(e)
 	}
 }
 
-// Close closes the airbrake notifier and flushes the error queue.
+// Close closes the airbrake notifier and flushes pending Sentry events.
+// Sentry events are flushed with a 2 second timeout.
 // You should call Close before app shutdown.
 // Close doesn't call os.Exit.
 func Close() {
 	if airbrake != nil {
 		airbrake.Close()
+	}
+	if sentryInited {
+		sentry.Flush(2 * time.Second)
 	}
 }
 
@@ -438,13 +482,13 @@ func SetEnvironment(env string) {
 		})
 	}
 	rollbar.Environment = env
-	raven.SetEnvironment(env)
+	sentryEnvironment = env
 }
 
 // SetRelease sets the release tag.
 // The release tag is used to group errors together by release.
 func SetRelease(rel string) {
-	raven.SetRelease(rel)
+	sentryRelease = rel
 }
 
 // SetTraceId updates the traceID based on context values
