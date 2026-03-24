@@ -271,14 +271,16 @@ func buildSentryEvent(err errors.ErrorExt, level string, extra map[string]interf
 		},
 	}
 
-	tags := make(map[string]string)
-	for _, t := range tagData {
-		for k, v := range t {
-			tags[k] = v
+	if len(tagData) > 0 {
+		tags := make(map[string]string)
+		for _, t := range tagData {
+			for k, v := range t {
+				tags[k] = v
+			}
 		}
-	}
-	if len(tags) > 0 {
-		event.Tags = tags
+		if len(tags) > 0 {
+			event.Tags = tags
+		}
 	}
 
 	return event
@@ -457,7 +459,8 @@ func NotifyOnPanic(rawData ...interface{}) {
 	}
 }
 
-// Close closes the airbrake notifier and flushes the error queue.
+// Close closes the airbrake notifier and flushes pending Sentry events.
+// Sentry events are flushed with a 2 second timeout.
 // You should call Close before app shutdown.
 // Close doesn't call os.Exit.
 func Close() {

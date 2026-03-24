@@ -52,11 +52,17 @@ func initTestSentry(t *testing.T) *capturedEvents {
 		t.Fatalf("failed to init sentry for test: %v", err)
 	}
 	sentryInited = true
+	t.Cleanup(func() {
+		sentryInited = false
+		sentryEnvironment = ""
+		sentryRelease = ""
+	})
 	return captured
 }
 
 func TestInitSentry_ValidDSN(t *testing.T) {
 	sentryInited = false
+	t.Cleanup(func() { sentryInited = false })
 	InitSentry("https://examplePublicKey@o0.ingest.sentry.io/0")
 	if !sentryInited {
 		t.Error("expected sentryInited to be true after valid DSN")
@@ -102,7 +108,6 @@ func TestConvToSentry(t *testing.T) {
 
 func TestSentryLevelMapping(t *testing.T) {
 	captured := initTestSentry(t)
-	defer func() { sentryInited = false }()
 
 	tests := []struct {
 		level    string
@@ -129,7 +134,6 @@ func TestSentryLevelMapping(t *testing.T) {
 
 func TestSentryTags(t *testing.T) {
 	captured := initTestSentry(t)
-	defer func() { sentryInited = false }()
 
 	tags := Tags{"method": "TestService.Get", "duration": "100ms"}
 	Notify(errors.New("test error"), tags)
@@ -148,11 +152,6 @@ func TestSentryTags(t *testing.T) {
 
 func TestSentryEnvironmentRelease(t *testing.T) {
 	captured := initTestSentry(t)
-	defer func() {
-		sentryInited = false
-		sentryEnvironment = ""
-		sentryRelease = ""
-	}()
 
 	SetEnvironment("staging")
 	SetRelease("v1.2.3")
@@ -173,7 +172,6 @@ func TestSentryEnvironmentRelease(t *testing.T) {
 
 func TestSentryExtra(t *testing.T) {
 	captured := initTestSentry(t)
-	defer func() { sentryInited = false }()
 
 	Notify(errors.New("test error"), "some extra data")
 
@@ -188,7 +186,6 @@ func TestSentryExtra(t *testing.T) {
 
 func TestNotifyOnPanicSentry(t *testing.T) {
 	captured := initTestSentry(t)
-	defer func() { sentryInited = false }()
 
 	func() {
 		defer func() {
@@ -212,7 +209,6 @@ func TestCloseSentry(t *testing.T) {
 	initTestSentry(t)
 	// Close should not panic
 	Close()
-	sentryInited = false
 }
 
 func TestBuildSentryEvent(t *testing.T) {

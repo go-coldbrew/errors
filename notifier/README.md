@@ -39,13 +39,13 @@ import "github.com/go-coldbrew/errors/notifier"
 
 
 <a name="Close"></a>
-## func [Close](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L463>)
+## func [Close](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L466>)
 
 ```go
 func Close()
 ```
 
-Close closes the airbrake notifier and flushes the error queue. You should call Close before app shutdown. Close doesn't call os.Exit.
+Close closes the airbrake notifier and flushes pending Sentry events. Sentry events are flushed with a 2 second timeout. You should call Close before app shutdown. Close doesn't call os.Exit.
 
 <a name="GetTraceHeaderName"></a>
 ## func [GetTraceHeaderName](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L90>)
@@ -57,7 +57,7 @@ func GetTraceHeaderName() string
 GetTraceHeaderName gets the header name for trace id default is x\-trace\-id
 
 <a name="GetTraceId"></a>
-## func [GetTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L523>)
+## func [GetTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L526>)
 
 ```go
 func GetTraceId(ctx context.Context) string
@@ -111,7 +111,7 @@ func NotifyAsync(err error, rawData ...interface{}) error
 NotifyAsync sends an error notification asynchronously with bounded concurrency. If the async notification pool is full, the notification is dropped to prevent goroutine explosion under sustained error bursts. Returns the original error for convenience.
 
 <a name="NotifyOnPanic"></a>
-## func [NotifyOnPanic](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L426>)
+## func [NotifyOnPanic](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L428>)
 
 ```go
 func NotifyOnPanic(rawData ...interface{})
@@ -120,7 +120,7 @@ func NotifyOnPanic(rawData ...interface{})
 NotifyOnPanic notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored rawData: extra data to notify with error \(can be context.Context, Tags, or any other data\) when rawData is context.Context, it will used to get extra data from loggers.FromContext\(ctx\) and tags from metadata this function should be called in defer example: defer NotifyOnPanic\(ctx, "some data"\) example: defer NotifyOnPanic\(ctx, "some data", Tags\{"tag1": "value1"\}\)
 
 <a name="NotifyWithExclude"></a>
-## func [NotifyWithExclude](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L395>)
+## func [NotifyWithExclude](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L397>)
 
 ```go
 func NotifyWithExclude(err error, rawData ...interface{}) error
@@ -138,7 +138,7 @@ func NotifyWithLevel(err error, level string, rawData ...interface{}) error
 NotifyWithLevel notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored err: error to notify level: error level rawData: extra data to notify with error \(can be context.Context, Tags, or any other data\) when rawData is context.Context, it will used to get extra data from loggers.FromContext\(ctx\) and tags from metadata
 
 <a name="NotifyWithLevelAndSkip"></a>
-## func [NotifyWithLevelAndSkip](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L293>)
+## func [NotifyWithLevelAndSkip](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L295>)
 
 ```go
 func NotifyWithLevelAndSkip(err error, skip int, level string, rawData ...interface{}) error
@@ -147,7 +147,7 @@ func NotifyWithLevelAndSkip(err error, skip int, level string, rawData ...interf
 NotifyWithLevelAndSkip notifies error to airbrake, rollbar and sentry if they are inited and error is not ignored err: error to notify skip: skip stack frames when notify error level: error level rawData: extra data to notify with error \(can be context.Context, Tags, or any other data\) when rawData is context.Context, it will used to get extra data from loggers.FromContext\(ctx\) and tags from metadata
 
 <a name="SetEnvironment"></a>
-## func [SetEnvironment](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L474>)
+## func [SetEnvironment](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L477>)
 
 ```go
 func SetEnvironment(env string)
@@ -156,7 +156,7 @@ func SetEnvironment(env string)
 SetEnvironment sets the environment. The environment is used to distinguish errors occurring in different
 
 <a name="SetHostname"></a>
-## func [SetHostname](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L559>)
+## func [SetHostname](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L562>)
 
 ```go
 func SetHostname(name string)
@@ -174,7 +174,7 @@ func SetMaxAsyncNotifications(n int)
 SetMaxAsyncNotifications sets the maximum number of concurrent async notification goroutines. When the limit is reached, new async notifications are dropped to prevent goroutine explosion under sustained error bursts. Default is 1000. Can only be called once; subsequent calls are no\-ops.
 
 <a name="SetRelease"></a>
-## func [SetRelease](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L487>)
+## func [SetRelease](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L490>)
 
 ```go
 func SetRelease(rel string)
@@ -183,7 +183,7 @@ func SetRelease(rel string)
 SetRelease sets the release tag. The release tag is used to group errors together by release.
 
 <a name="SetServerRoot"></a>
-## func [SetServerRoot](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L553>)
+## func [SetServerRoot](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L556>)
 
 ```go
 func SetServerRoot(path string)
@@ -201,7 +201,7 @@ func SetTraceHeaderName(name string)
 SetTraceHeaderName sets the header name for trace id default is x\-trace\-id
 
 <a name="SetTraceId"></a>
-## func [SetTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L494>)
+## func [SetTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L497>)
 
 ```go
 func SetTraceId(ctx context.Context) context.Context
@@ -210,7 +210,7 @@ func SetTraceId(ctx context.Context) context.Context
 SetTraceId updates the traceID based on context values if no trace id is found then it will create one and update the context You should use the context returned by this function instead of the one passed
 
 <a name="UpdateTraceId"></a>
-## func [UpdateTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L543>)
+## func [UpdateTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L546>)
 
 ```go
 func UpdateTraceId(ctx context.Context, traceID string) context.Context
