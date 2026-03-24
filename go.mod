@@ -1,6 +1,6 @@
 module github.com/go-coldbrew/errors
 
-go 1.25.0
+go 1.25.8
 
 require (
 	github.com/getsentry/sentry-go v0.43.0
