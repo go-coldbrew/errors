@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	gobrake "github.com/airbrake/gobrake/v5"
 	"github.com/getsentry/sentry-go"
 	"github.com/go-coldbrew/errors"
 	"github.com/go-coldbrew/log"
@@ -19,7 +20,6 @@ import (
 	stdopentracing "github.com/opentracing/opentracing-go"
 	rollbar "github.com/rollbar/rollbar-go"
 	"google.golang.org/grpc/metadata"
-	gobrake "github.com/airbrake/gobrake/v5"
 )
 
 var (
