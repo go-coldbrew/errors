@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	gobrake "github.com/airbrake/gobrake/v5"
 	"github.com/getsentry/sentry-go"
 	"github.com/go-coldbrew/errors"
 	"github.com/go-coldbrew/log"
@@ -17,9 +18,8 @@ import (
 	"github.com/go-coldbrew/options"
 	"github.com/google/uuid"
 	stdopentracing "github.com/opentracing/opentracing-go"
-	"github.com/stvp/rollbar"
+	rollbar "github.com/rollbar/rollbar-go"
 	"google.golang.org/grpc/metadata"
-	gobrake "gopkg.in/airbrake/gobrake.v2"
 )
 
 var (
@@ -108,15 +108,43 @@ func (tags Tags) value() map[string]string {
 // projectID: airbrake project id
 // projectKey: airbrake project key
 func InitAirbrake(projectID int64, projectKey string) {
-	airbrake = gobrake.NewNotifier(projectID, projectKey)
+	airbrake = gobrake.NewNotifierWithOptions(&gobrake.NotifierOptions{
+		ProjectId:   projectID,
+		ProjectKey:  projectKey,
+		Environment: sentryEnvironment,
+	})
 }
 
 // InitRollbar inits rollbar configuration
 // token: rollbar token
 // env: rollbar environment
 func InitRollbar(token, env string) {
-	rollbar.Token = token
-	rollbar.Environment = env
+	rollbar.SetToken(token)
+	rollbar.SetEnvironment(env)
+	rollbar.SetStackTracer(func(err error) ([]runtime.Frame, bool) {
+		if ext, ok := err.(errors.ErrorExt); ok {
+			pcs := ext.Callers()
+			if len(pcs) == 0 {
+				return nil, false
+			}
+			frames := make([]runtime.Frame, 0, len(pcs))
+			callersFrames := runtime.CallersFrames(pcs)
+			for {
+				f, more := callersFrames.Next()
+				if f.Function != "" {
+					frames = append(frames, f)
+				}
+				if !more {
+					break
+				}
+			}
+			if len(frames) == 0 {
+				return nil, false
+			}
+			return frames, true
+		}
+		return nil, false
+	})
 	rollbarInited = true
 }
 
@@ -142,18 +170,6 @@ func convToGoBrake(in []errors.StackFrame) []gobrake.StackFrame {
 			File: s.File,
 			Func: s.Func,
 			Line: s.Line,
-		})
-	}
-	return out
-}
-
-func convToRollbar(in []errors.StackFrame) rollbar.Stack {
-	out := rollbar.Stack{}
-	for _, s := range in {
-		out = append(out, rollbar.Frame{
-			Filename: s.File,
-			Method:   s.Func,
-			Line:     s.Line,
 		})
 	}
 	return out
@@ -368,17 +384,15 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 
 	parsedData, tagData := parseRawData(ctx, list...)
 	if rollbarInited {
-		fields := []*rollbar.Field{}
-		if len(list) > 0 {
-			for k, v := range parsedData {
-				fields = append(fields, &rollbar.Field{Name: k, Data: v})
-			}
+		extras := make(map[string]interface{})
+		for k, v := range parsedData {
+			extras[k] = v
 		}
 		if traceID != "" {
-			fields = append(fields, &rollbar.Field{Name: "traceId", Data: traceID})
+			extras["traceId"] = traceID
 		}
-		fields = append(fields, &rollbar.Field{Name: "server", Data: map[string]interface{}{"hostname": getHostname(), "root": getServerRoot()}})
-		rollbar.ErrorWithStack(level, errWithStack, convToRollbar(errWithStack.StackFrame()), fields...)
+		extras["server"] = map[string]interface{}{"hostname": getHostname(), "root": getServerRoot()}
+		rollbar.ErrorWithStackSkipWithExtras(level, errWithStack, skip+1, extras)
 	}
 
 	if sentryInited {
@@ -449,7 +463,7 @@ func NotifyOnPanic(rawData ...interface{}) {
 		}
 		parsedData, tagData := parseRawData(ctx, rawData...)
 		if rollbarInited {
-			rollbar.ErrorWithStack(rollbar.CRIT, e, convToRollbar(e.StackFrame()), &rollbar.Field{Name: "panic", Data: r})
+			rollbar.ErrorWithStackSkipWithExtras(rollbar.CRIT, e, 1, map[string]interface{}{"panic": r})
 		}
 		if sentryInited {
 			event := buildSentryEvent(e, "critical", parsedData, tagData)
@@ -481,7 +495,7 @@ func SetEnvironment(env string) {
 			return notice
 		})
 	}
-	rollbar.Environment = env
+	rollbar.SetEnvironment(env)
 	sentryEnvironment = env
 }
 
