@@ -7,8 +7,8 @@ test:
 
 doc:
 	go install github.com/princjef/gomarkdoc/cmd/gomarkdoc@latest
-	gomarkdoc ./...
-	cd notifier && gomarkdoc ./...
+	gomarkdoc .
+	cd notifier && gomarkdoc .
 
 lint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest

@@ -61,7 +61,7 @@ func ExampleWrapWithStatus() {
 }
 
 // Cause returns the root cause of a wrapped error chain.
-func ExampleErrorExt_Cause() {
+func Example_cause() {
 	root := io.EOF
 	first := errors.Wrap(root, "read body")
 	second := errors.Wrap(first, "handle request")

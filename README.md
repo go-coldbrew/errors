@@ -39,6 +39,41 @@ if you want to wrap an existing error, skip some functions on the stack and add 
 
 Head to https://docs.coldbrew.cloud for more information.
 
+<details><summary>Example (Cause)</summary>
+<p>
+
+Cause returns the root cause of a wrapped error chain.
+
+```go
+package main
+
+import (
+	"fmt"
+	"io"
+
+	"github.com/go-coldbrew/errors"
+)
+
+func main() {
+	root := io.EOF
+	first := errors.Wrap(root, "read body")
+	second := errors.Wrap(first, "handle request")
+
+	fmt.Println("error:", second)
+	fmt.Println("cause:", second.Cause())
+}
+```
+
+#### Output
+
+```
+error: handle request: read body: EOF
+cause: EOF
+```
+
+</p>
+</details>
+
 <details><summary>Example (Stack Frame)</summary>
 <p>
 
@@ -126,41 +161,6 @@ type ErrorExt interface {
     // contains filtered or unexported methods
 }
 ```
-
-<details><summary>Example (#ause)</summary>
-<p>
-
-Cause returns the root cause of a wrapped error chain.
-
-```go
-package main
-
-import (
-	"fmt"
-	"io"
-
-	"github.com/go-coldbrew/errors"
-)
-
-func main() {
-	root := io.EOF
-	first := errors.Wrap(root, "read body")
-	second := errors.Wrap(first, "handle request")
-
-	fmt.Println("error:", second)
-	fmt.Println("cause:", second.Cause())
-}
-```
-
-#### Output
-
-```
-error: handle request: read body: EOF
-cause: EOF
-```
-
-</p>
-</details>
 
 <a name="New"></a>
 ### func [New](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L156>)
