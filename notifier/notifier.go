@@ -22,6 +22,9 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+// Compile-time version compatibility check.
+var _ = log.SupportPackageIsVersion1
+
 var (
 	airbrake           *gobrake.Notifier
 	rollbarInited      bool
