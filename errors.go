@@ -10,6 +10,10 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
+// SupportPackageIsVersion1 is a compile-time assertion constant.
+// Downstream packages reference this to enforce version compatibility.
+const SupportPackageIsVersion1 = true
+
 var (
 	basePath      = ""
 	maxStackDepth = 64

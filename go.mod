@@ -5,8 +5,8 @@ go 1.25.8
 require (
 	github.com/airbrake/gobrake/v5 v5.6.2
 	github.com/getsentry/sentry-go v0.43.0
-	github.com/go-coldbrew/log v0.2.5
-	github.com/go-coldbrew/options v0.2.4
+	github.com/go-coldbrew/log v0.2.7
+	github.com/go-coldbrew/options v0.2.6
 	github.com/google/uuid v1.6.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/rollbar/rollbar-go v1.4.8
@@ -80,7 +80,7 @@ require (
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
 	github.com/firefart/nonamedreturns v1.0.6 // indirect
-	github.com/fsnotify/fsnotify v1.5.4 // indirect
+	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/fzipp/gocyclo v0.6.0 // indirect
 	github.com/ghostiam/protogetter v0.3.20 // indirect
 	github.com/go-critic/go-critic v0.14.3 // indirect
