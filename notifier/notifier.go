@@ -17,8 +17,8 @@ import (
 	"github.com/go-coldbrew/log/loggers"
 	"github.com/go-coldbrew/options"
 	"github.com/google/uuid"
-	stdopentracing "github.com/opentracing/opentracing-go"
 	rollbar "github.com/rollbar/rollbar-go"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -354,16 +354,20 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 		}
 	}
 
-	// try to fetch a traceID and context from rawData
-	var traceID string
+	// try to fetch a correlation ID and OTEL trace ID from rawData
+	var correlationID string
+	var otelTraceID string
 	ctx := context.Background()
 	for _, d := range list {
 		if c, ok := d.(context.Context); ok {
-			if span := stdopentracing.SpanFromContext(c); span != nil {
-				traceID = span.BaggageItem("trace")
-			}
-			if strings.TrimSpace(traceID) == "" {
-				traceID = GetTraceId(c)
+			// Application-level correlation ID (set via SetTraceId) takes precedence.
+			correlationID = GetTraceId(c)
+			// OTEL distributed trace ID is captured separately for linking.
+			if span := oteltrace.SpanFromContext(c); span.SpanContext().IsValid() {
+				otelTraceID = span.SpanContext().TraceID().String()
+				if strings.TrimSpace(correlationID) == "" {
+					correlationID = otelTraceID
+				}
 			}
 			ctx = c
 			break
@@ -379,8 +383,11 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 				n.Context[k] = v
 			}
 		}
-		if traceID != "" {
-			n.Context["traceId"] = traceID
+		if correlationID != "" {
+			n.Context["traceId"] = correlationID
+		}
+		if otelTraceID != "" {
+			n.Context["otelTraceId"] = otelTraceID
 		}
 		airbrake.SendNoticeAsync(n)
 	}
@@ -391,8 +398,11 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 		for k, v := range parsedData {
 			extras[k] = v
 		}
-		if traceID != "" {
-			extras["traceId"] = traceID
+		if correlationID != "" {
+			extras["traceId"] = correlationID
+		}
+		if otelTraceID != "" {
+			extras["otelTraceId"] = otelTraceID
 		}
 		extras["server"] = map[string]interface{}{"hostname": getHostname(), "root": getServerRoot()}
 		rollbar.ErrorWithStackSkipWithExtras(level, errWithStack, skip+1, extras)
@@ -523,8 +533,8 @@ func SetTraceId(ctx context.Context) context.Context {
 			traceID = strings.Join(id, ",")
 		}
 	}
-	if span := stdopentracing.SpanFromContext(ctx); span != nil && strings.TrimSpace(traceID) == "" {
-		traceID = span.BaggageItem("trace")
+	if span := oteltrace.SpanFromContext(ctx); span.SpanContext().IsValid() && strings.TrimSpace(traceID) == "" {
+		traceID = span.SpanContext().TraceID().String()
 	}
 	// if no trace id then create one
 	if strings.TrimSpace(traceID) == "" {
