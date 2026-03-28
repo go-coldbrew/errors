@@ -17,8 +17,8 @@ import (
 	"github.com/go-coldbrew/log/loggers"
 	"github.com/go-coldbrew/options"
 	"github.com/google/uuid"
-	oteltrace "go.opentelemetry.io/otel/trace"
 	rollbar "github.com/rollbar/rollbar-go"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/metadata"
 )
 
