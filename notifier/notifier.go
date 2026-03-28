@@ -17,7 +17,7 @@ import (
 	"github.com/go-coldbrew/log/loggers"
 	"github.com/go-coldbrew/options"
 	"github.com/google/uuid"
-	stdopentracing "github.com/opentracing/opentracing-go"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	rollbar "github.com/rollbar/rollbar-go"
 	"google.golang.org/grpc/metadata"
 )
@@ -359,8 +359,8 @@ func doNotify(err error, skip int, level string, rawData ...interface{}) error {
 	ctx := context.Background()
 	for _, d := range list {
 		if c, ok := d.(context.Context); ok {
-			if span := stdopentracing.SpanFromContext(c); span != nil {
-				traceID = span.BaggageItem("trace")
+			if span := oteltrace.SpanFromContext(c); span.SpanContext().IsValid() {
+				traceID = span.SpanContext().TraceID().String()
 			}
 			if strings.TrimSpace(traceID) == "" {
 				traceID = GetTraceId(c)
@@ -523,8 +523,8 @@ func SetTraceId(ctx context.Context) context.Context {
 			traceID = strings.Join(id, ",")
 		}
 	}
-	if span := stdopentracing.SpanFromContext(ctx); span != nil && strings.TrimSpace(traceID) == "" {
-		traceID = span.BaggageItem("trace")
+	if span := oteltrace.SpanFromContext(ctx); span.SpanContext().IsValid() && strings.TrimSpace(traceID) == "" {
+		traceID = span.SpanContext().TraceID().String()
 	}
 	// if no trace id then create one
 	if strings.TrimSpace(traceID) == "" {
