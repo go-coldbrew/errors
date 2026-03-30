@@ -19,7 +19,7 @@ const SupportPackageIsVersion1 = true
 const defaultStackDepth = 16
 
 var (
-	basePath         = ""
+	atomicBasePath   atomic.Value // stores string
 	atomicStackDepth atomic.Int32
 )
 
@@ -128,7 +128,7 @@ func (c *customError) captureStack(skip int) {
 	pcs := make([]uintptr, depth)
 	n := runtime.Callers(skip+2, pcs)
 	c.stack = pcs[:n]
-	c.basePath = basePath
+	c.basePath, _ = atomicBasePath.Load().(string)
 }
 
 // resolveFrames converts program counters to structured stack frames.
@@ -285,6 +285,6 @@ func Wrapf(err error, format string, args ...any) ErrorExt {
 func SetBaseFilePath(path string) {
 	path = strings.TrimSpace(path)
 	if path != "" {
-		basePath = path
+		atomicBasePath.Store(path)
 	}
 }
