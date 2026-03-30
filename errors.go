@@ -259,7 +259,7 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 // SetMaxStackDepth sets the maximum number of stack frames captured when creating errors.
 // Default is 16. Safe for concurrent use.
 func SetMaxStackDepth(n int) {
-	if n > 0 {
+	if n > 0 && n <= 256 {
 		atomicStackDepth.Store(int32(n))
 	}
 }
