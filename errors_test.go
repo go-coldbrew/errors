@@ -105,10 +105,9 @@ func TestWrapf(t *testing.T) {
 }
 
 func TestStackDepthCapped(t *testing.T) {
-	// With default max of 64, stack should never exceed that
 	err := New("test")
-	if len(err.StackFrame()) > 64 {
-		t.Errorf("stack depth %d exceeds max 64", len(err.StackFrame()))
+	if len(err.StackFrame()) > defaultStackDepth {
+		t.Errorf("stack depth %d exceeds max %d", len(err.StackFrame()), defaultStackDepth)
 	}
 }
 
@@ -121,13 +120,74 @@ func TestStackDepthCappedDeep(t *testing.T) {
 		return createDeepError(depth - 1)
 	}
 
-	// Create error from a stack deeper than 64
 	err := createDeepError(100)
-	if len(err.StackFrame()) > 64 {
-		t.Errorf("stack depth %d exceeds max 64", len(err.StackFrame()))
+	if len(err.StackFrame()) > defaultStackDepth {
+		t.Errorf("stack depth %d exceeds max %d", len(err.StackFrame()), defaultStackDepth)
 	}
 	if len(err.StackFrame()) == 0 {
 		t.Error("stack should not be empty")
+	}
+}
+
+func TestSetMaxStackDepth(t *testing.T) {
+	// Save and restore
+	prev := atomicStackDepth.Load()
+	defer atomicStackDepth.Store(prev)
+
+	SetMaxStackDepth(8)
+	if got := atomicStackDepth.Load(); got != 8 {
+		t.Fatalf("expected depth 8, got %d", got)
+	}
+
+	// Zero is ignored
+	SetMaxStackDepth(0)
+	if got := atomicStackDepth.Load(); got != 8 {
+		t.Fatalf("expected depth 8 (unchanged), got %d", got)
+	}
+
+	// Negative is ignored
+	SetMaxStackDepth(-1)
+	if got := atomicStackDepth.Load(); got != 8 {
+		t.Fatalf("expected depth 8 (unchanged), got %d", got)
+	}
+
+	// Over 256 is ignored
+	SetMaxStackDepth(1000)
+	if got := atomicStackDepth.Load(); got != 8 {
+		t.Fatalf("expected depth 8 (unchanged), got %d", got)
+	}
+
+	// 256 is accepted
+	SetMaxStackDepth(256)
+	if got := atomicStackDepth.Load(); got != 256 {
+		t.Fatalf("expected depth 256, got %d", got)
+	}
+}
+
+func TestStackFrameConsistency(t *testing.T) {
+	err := New("consistency test")
+
+	// First call resolves lazily
+	frames1 := err.StackFrame()
+	// Second call returns cached result
+	frames2 := err.StackFrame()
+
+	if len(frames1) != len(frames2) {
+		t.Fatalf("frame count changed: %d vs %d", len(frames1), len(frames2))
+	}
+	for i := range frames1 {
+		if frames1[i] != frames2[i] {
+			t.Fatalf("frame %d differs: %+v vs %+v", i, frames1[i], frames2[i])
+		}
+	}
+
+	// Callers should remain unchanged
+	pcs := err.Callers()
+	if len(pcs) == 0 {
+		t.Fatal("Callers() should not be empty")
+	}
+	if len(pcs) != len(frames1) {
+		t.Fatalf("Callers count %d != StackFrame count %d", len(pcs), len(frames1))
 	}
 }
 

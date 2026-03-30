@@ -57,6 +57,7 @@ type customError struct {
 	stack        []uintptr
 	frame        []StackFrame
 	frameOnce    sync.Once
+	basePath     string // snapshot of basePath at capture time
 	cause        error
 	wrapped      error // immediate parent for Unwrap() chain; may differ from cause
 	shouldNotify bool
@@ -93,7 +94,7 @@ func (c *customError) StackTrace() []uintptr {
 func (c *customError) StackFrame() []StackFrame {
 	c.frameOnce.Do(func() {
 		if len(c.stack) > 0 {
-			c.frame = resolveFrames(c.stack)
+			c.frame = resolveFrames(c.stack, c.basePath)
 		}
 	})
 	return c.frame
@@ -127,17 +128,18 @@ func (c *customError) captureStack(skip int) {
 	pcs := make([]uintptr, depth)
 	n := runtime.Callers(skip+2, pcs)
 	c.stack = pcs[:n]
+	c.basePath = basePath
 }
 
 // resolveFrames converts program counters to structured stack frames.
-func resolveFrames(pcs []uintptr) []StackFrame {
+func resolveFrames(pcs []uintptr, base string) []StackFrame {
 	frames := runtime.CallersFrames(pcs)
 	stack := make([]StackFrame, 0, len(pcs))
 	for {
 		frame, more := frames.Next()
 		file := frame.File
-		if basePath != "" {
-			file = strings.TrimPrefix(file, basePath)
+		if base != "" {
+			file = strings.TrimPrefix(file, base)
 		}
 		_, funcName := splitFuncName(frame.Function)
 		stack = append(stack, StackFrame{
@@ -257,7 +259,8 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 }
 
 // SetMaxStackDepth sets the maximum number of stack frames captured when creating errors.
-// Default is 16. Safe for concurrent use.
+// Accepts values in [1, 256]; out-of-range values are ignored. Default is 16.
+// Safe for concurrent use.
 func SetMaxStackDepth(n int) {
 	if n > 0 && n <= 256 {
 		atomicStackDepth.Store(int32(n))

@@ -134,7 +134,7 @@ const SupportPackageIsVersion1 = true
 ```
 
 <a name="SetBaseFilePath"></a>
-## func [SetBaseFilePath](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L278>)
+## func [SetBaseFilePath](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L281>)
 
 ```go
 func SetBaseFilePath(path string)
@@ -143,13 +143,13 @@ func SetBaseFilePath(path string)
 SetBaseFilePath sets the base file path for linking source code with reported stack information
 
 <a name="SetMaxStackDepth"></a>
-## func [SetMaxStackDepth](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L261>)
+## func [SetMaxStackDepth](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L264>)
 
 ```go
 func SetMaxStackDepth(n int)
 ```
 
-SetMaxStackDepth sets the maximum number of stack frames captured when creating errors. Default is 16. Safe for concurrent use.
+SetMaxStackDepth sets the maximum number of stack frames captured when creating errors. Accepts values in \[1, 256\]; out\-of\-range values are ignored. Default is 16. Safe for concurrent use.
 
 <a name="ErrorExt"></a>
 ## type [ErrorExt](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L34-L45>)
@@ -172,7 +172,7 @@ type ErrorExt interface {
 ```
 
 <a name="New"></a>
-### func [New](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L178>)
+### func [New](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L180>)
 
 ```go
 func New(msg string) ErrorExt
@@ -210,7 +210,7 @@ something went wrong
 </details>
 
 <a name="NewWithSkip"></a>
-### func [NewWithSkip](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L188>)
+### func [NewWithSkip](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L190>)
 
 ```go
 func NewWithSkip(msg string, skip int) ErrorExt
@@ -219,7 +219,7 @@ func NewWithSkip(msg string, skip int) ErrorExt
 NewWithSkip creates a new error skipping the number of function on the stack
 
 <a name="NewWithSkipAndStatus"></a>
-### func [NewWithSkipAndStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L193>)
+### func [NewWithSkipAndStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L195>)
 
 ```go
 func NewWithSkipAndStatus(msg string, skip int, status *grpcstatus.Status) ErrorExt
@@ -228,7 +228,7 @@ func NewWithSkipAndStatus(msg string, skip int, status *grpcstatus.Status) Error
 NewWithSkipAndStatus creates a new error skipping the number of function on the stack and GRPC status
 
 <a name="NewWithStatus"></a>
-### func [NewWithStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L183>)
+### func [NewWithStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L185>)
 
 ```go
 func NewWithStatus(msg string, status *grpcstatus.Status) ErrorExt
@@ -237,7 +237,7 @@ func NewWithStatus(msg string, status *grpcstatus.Status) ErrorExt
 NewWithStatus creates a new error with statck information and GRPC status
 
 <a name="Newf"></a>
-### func [Newf](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L268>)
+### func [Newf](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L271>)
 
 ```go
 func Newf(format string, args ...any) ErrorExt
@@ -275,7 +275,7 @@ user alice not found
 </details>
 
 <a name="Wrap"></a>
-### func [Wrap](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L198>)
+### func [Wrap](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L200>)
 
 ```go
 func Wrap(err error, msg string) ErrorExt
@@ -349,7 +349,7 @@ true
 </details>
 
 <a name="WrapWithSkip"></a>
-### func [WrapWithSkip](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L208>)
+### func [WrapWithSkip](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L210>)
 
 ```go
 func WrapWithSkip(err error, msg string, skip int) ErrorExt
@@ -358,7 +358,7 @@ func WrapWithSkip(err error, msg string, skip int) ErrorExt
 WrapWithSkip wraps an existing error and appends stack information if it does not exists skipping the number of function on the stack
 
 <a name="WrapWithSkipAndStatus"></a>
-### func [WrapWithSkipAndStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L213>)
+### func [WrapWithSkipAndStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L215>)
 
 ```go
 func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.Status) ErrorExt
@@ -367,7 +367,7 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 WrapWithSkip wraps an existing error and appends stack information if it does not exists skipping the number of function on the stack along with GRPC status
 
 <a name="WrapWithStatus"></a>
-### func [WrapWithStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L203>)
+### func [WrapWithStatus](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L205>)
 
 ```go
 func WrapWithStatus(err error, msg string, status *grpcstatus.Status) ErrorExt
@@ -412,7 +412,7 @@ gRPC code: NotFound
 </details>
 
 <a name="Wrapf"></a>
-### func [Wrapf](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L273>)
+### func [Wrapf](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L276>)
 
 ```go
 func Wrapf(err error, format string, args ...any) ErrorExt
