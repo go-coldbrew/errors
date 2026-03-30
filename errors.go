@@ -134,7 +134,8 @@ func (c *customError) captureStack(skip int) {
 // resolveFrames converts program counters to structured stack frames.
 func resolveFrames(pcs []uintptr, base string) []StackFrame {
 	frames := runtime.CallersFrames(pcs)
-	stack := make([]StackFrame, 0, len(pcs))
+	maxFrames := len(pcs)
+	stack := make([]StackFrame, 0, maxFrames)
 	for {
 		frame, more := frames.Next()
 		file := frame.File
@@ -147,7 +148,7 @@ func resolveFrames(pcs []uintptr, base string) []StackFrame {
 			Line: frame.Line,
 			Func: funcName,
 		})
-		if !more {
+		if !more || len(stack) >= maxFrames {
 			break
 		}
 	}
@@ -240,6 +241,9 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 		}
 
 		c.stack = e.Callers()
+		if ce, ok := e.(*customError); ok {
+			c.basePath = ce.basePath
+		}
 		if n, ok := e.(NotifyExt); ok {
 			c.shouldNotify = n.ShouldNotify()
 		}

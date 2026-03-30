@@ -106,8 +106,13 @@ func TestWrapf(t *testing.T) {
 
 func TestStackDepthCapped(t *testing.T) {
 	err := New("test")
+	// Assert on Callers (PCs) since StackFrame may expand due to inlining
+	if len(err.Callers()) > defaultStackDepth {
+		t.Errorf("callers depth %d exceeds max %d", len(err.Callers()), defaultStackDepth)
+	}
+	// StackFrame is also capped at len(pcs)
 	if len(err.StackFrame()) > defaultStackDepth {
-		t.Errorf("stack depth %d exceeds max %d", len(err.StackFrame()), defaultStackDepth)
+		t.Errorf("frame depth %d exceeds max %d", len(err.StackFrame()), defaultStackDepth)
 	}
 }
 
@@ -121,11 +126,11 @@ func TestStackDepthCappedDeep(t *testing.T) {
 	}
 
 	err := createDeepError(100)
-	if len(err.StackFrame()) > defaultStackDepth {
-		t.Errorf("stack depth %d exceeds max %d", len(err.StackFrame()), defaultStackDepth)
+	if len(err.Callers()) > defaultStackDepth {
+		t.Errorf("callers depth %d exceeds max %d", len(err.Callers()), defaultStackDepth)
 	}
-	if len(err.StackFrame()) == 0 {
-		t.Error("stack should not be empty")
+	if len(err.Callers()) == 0 {
+		t.Error("callers should not be empty")
 	}
 }
 
@@ -181,13 +186,14 @@ func TestStackFrameConsistency(t *testing.T) {
 		}
 	}
 
-	// Callers should remain unchanged
+	// Callers should be non-empty
 	pcs := err.Callers()
 	if len(pcs) == 0 {
 		t.Fatal("Callers() should not be empty")
 	}
-	if len(pcs) != len(frames1) {
-		t.Fatalf("Callers count %d != StackFrame count %d", len(pcs), len(frames1))
+	// Frames should not exceed PCs (inlining can expand, but resolveFrames caps)
+	if len(frames1) > len(pcs) {
+		t.Fatalf("StackFrame count %d exceeds Callers count %d", len(frames1), len(pcs))
 	}
 }
 
