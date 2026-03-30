@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -14,9 +16,11 @@ import (
 // Downstream packages reference this to enforce version compatibility.
 const SupportPackageIsVersion1 = true
 
+const defaultStackDepth = 16
+
 var (
-	basePath      = ""
-	maxStackDepth = 64
+	basePath         = ""
+	atomicStackDepth atomic.Int32
 )
 
 // StackFrame represents the stackframe for tracing exception
@@ -52,6 +56,7 @@ type customError struct {
 	Msg          string
 	stack        []uintptr
 	frame        []StackFrame
+	frameOnce    sync.Once
 	cause        error
 	wrapped      error // immediate parent for Unwrap() chain; may differ from cause
 	shouldNotify bool
@@ -69,32 +74,38 @@ func (c *customError) Notified(status bool) {
 }
 
 // Error returns the error message.
-func (c customError) Error() string {
+func (c *customError) Error() string {
 	return c.Msg
 }
 
 // Callers returns the program counters of the call stack when the error was created.
-func (c customError) Callers() []uintptr {
+func (c *customError) Callers() []uintptr {
 	return c.stack[:]
 }
 
 // StackTrace returns the program counters of the call stack (alias for Callers).
-func (c customError) StackTrace() []uintptr {
+func (c *customError) StackTrace() []uintptr {
 	return c.Callers()
 }
 
 // StackFrame returns the structured stack frames for the error.
-func (c customError) StackFrame() []StackFrame {
+// Frames are resolved lazily from program counters on first access.
+func (c *customError) StackFrame() []StackFrame {
+	c.frameOnce.Do(func() {
+		if len(c.stack) > 0 {
+			c.frame = resolveFrames(c.stack)
+		}
+	})
 	return c.frame
 }
 
 // Cause returns the root cause error that originated this error chain.
-func (c customError) Cause() error {
+func (c *customError) Cause() error {
 	return c.cause
 }
 
 // GRPCStatus returns the gRPC status for this error.
-func (c customError) GRPCStatus() *grpcstatus.Status {
+func (c *customError) GRPCStatus() *grpcstatus.Status {
 	if c.status != nil {
 		// use latest error message and keep other data (e.g. details)
 		newStatus := c.status.Proto()
@@ -106,43 +117,50 @@ func (c customError) GRPCStatus() *grpcstatus.Status {
 	return grpcstatus.New(codes.Internal, c.Error())
 }
 
-func (c *customError) generateStack(skip int) []StackFrame {
-	stack := []StackFrame{}
-	trace := []uintptr{}
-	for i := skip + 1; i < skip+1+maxStackDepth; i++ {
-		pc, file, line, ok := runtime.Caller(i)
-		if !ok {
-			break
-		}
-		_, funcName := packageFuncName(pc)
+// captureStack records program counters for the call stack.
+// Symbolization is deferred until StackFrame() is called.
+func (c *customError) captureStack(skip int) {
+	depth := int(atomicStackDepth.Load())
+	if depth == 0 {
+		depth = defaultStackDepth
+	}
+	pcs := make([]uintptr, depth)
+	n := runtime.Callers(skip+2, pcs)
+	c.stack = pcs[:n]
+}
+
+// resolveFrames converts program counters to structured stack frames.
+func resolveFrames(pcs []uintptr) []StackFrame {
+	frames := runtime.CallersFrames(pcs)
+	stack := make([]StackFrame, 0, len(pcs))
+	for {
+		frame, more := frames.Next()
+		file := frame.File
 		if basePath != "" {
-			file = strings.Replace(file, basePath, "", 1)
+			file = strings.TrimPrefix(file, basePath)
 		}
+		_, funcName := splitFuncName(frame.Function)
 		stack = append(stack, StackFrame{
 			File: file,
-			Line: line,
+			Line: frame.Line,
 			Func: funcName,
 		})
-		trace = append(trace, pc)
+		if !more {
+			break
+		}
 	}
-	c.frame = stack
-	c.stack = trace
 	return stack
 }
 
 // Unwrap returns the immediate parent error for use with errors.Is and errors.As.
-func (c customError) Unwrap() error {
+func (c *customError) Unwrap() error {
 	return c.wrapped
 }
 
-func packageFuncName(pc uintptr) (string, string) {
-	f := runtime.FuncForPC(pc)
-	if f == nil {
-		return "", ""
-	}
-
+// splitFuncName splits a fully qualified function name into package and function parts.
+func splitFuncName(qualifiedName string) (string, string) {
 	packageName := ""
-	funcName := f.Name()
+	funcName := qualifiedName
 
 	if ind := strings.LastIndex(funcName, "/"); ind > 0 {
 		packageName += funcName[:ind+1]
@@ -220,7 +238,6 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 		}
 
 		c.stack = e.Callers()
-		c.frame = e.StackFrame()
 		if n, ok := e.(NotifyExt); ok {
 			c.shouldNotify = n.ShouldNotify()
 		}
@@ -234,16 +251,16 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 		shouldNotify: true,
 		status:       status,
 	}
-	c.generateStack(skip + 1)
+	c.captureStack(skip + 1)
 	return c
 
 }
 
 // SetMaxStackDepth sets the maximum number of stack frames captured when creating errors.
-// Default is 64. Must be called during initialization.
+// Default is 16. Safe for concurrent use.
 func SetMaxStackDepth(n int) {
 	if n > 0 {
-		maxStackDepth = n
+		atomicStackDepth.Store(int32(n))
 	}
 }
 
