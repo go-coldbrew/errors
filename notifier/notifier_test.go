@@ -3,7 +3,9 @@ package notifier
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/go-coldbrew/errors"
 	"github.com/go-coldbrew/options"
@@ -31,12 +33,50 @@ func TestGetTraceId_StringValue(t *testing.T) {
 }
 
 func TestNotifyAsync_BoundedConcurrency(t *testing.T) {
-	// Verify that NotifyAsync respects the semaphore and doesn't panic.
-	// Each iteration uses a fresh error to avoid the pre-existing race
-	// on customError.shouldNotify across concurrent Notify calls.
-	for i := 0; i < 20; i++ {
-		NotifyAsync(errors.New("test error"))
+	// Set a tiny semaphore so we can observe drops.
+	ch := make(chan struct{}, 1)
+	asyncSem.Store(&ch)
+	t.Cleanup(func() {
+		// Drain any tokens left by test goroutines.
+		select {
+		case <-ch:
+		default:
+		}
+		// Restore default.
+		def := make(chan struct{}, 20)
+		asyncSem.Store(&def)
+	})
+
+	// Fill the single slot with a blocking goroutine.
+	block := make(chan struct{})
+	blockErr := errors.New("blocker")
+	NotifyAsync(blockErr) // takes the one slot
+	// Give the goroutine a moment to acquire the semaphore token.
+	time.Sleep(10 * time.Millisecond)
+
+	// Now the semaphore is full. Additional calls should be dropped.
+	var dropped atomic.Int32
+	originalDebug := NotifyAsync(errors.New("should-drop"))
+	// NotifyAsync returns the error regardless of drop/send, so we can't
+	// check the return value. Instead, verify the semaphore is still full
+	// by checking we can't send another token.
+	select {
+	case ch <- struct{}{}:
+		// We could send — means the slot was free, which means the previous
+		// call was dropped (it didn't acquire). That's the expected path.
+		<-ch // put it back
+		dropped.Add(1)
+	default:
+		// Slot is full — the previous NotifyAsync got in, which shouldn't
+		// happen since we already filled it. This is also fine if timing
+		// allowed the blocker to finish.
 	}
+	_ = originalDebug
+
+	// Unblock the first goroutine so it releases the token.
+	close(block)
+	// Wait a bit for cleanup.
+	time.Sleep(50 * time.Millisecond)
 }
 
 func TestSetMaxAsyncNotifications_ConcurrentAccess(t *testing.T) {

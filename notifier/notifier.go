@@ -59,8 +59,8 @@ var asyncSemOnce sync.Once
 // SetMaxAsyncNotifications sets the maximum number of concurrent async
 // notification goroutines. When the limit is reached, new async notifications
 // are dropped to prevent goroutine explosion under sustained error bursts.
-// Default is 20. Can only be called once; subsequent calls are no-ops.
-// Must be called during initialization, before any notifications are sent.
+// Default is 20. The first successful call wins; subsequent calls are no-ops.
+// It is safe to call concurrently with NotifyAsync.
 func SetMaxAsyncNotifications(n int) {
 	if n > 0 {
 		asyncSemOnce.Do(func() {
