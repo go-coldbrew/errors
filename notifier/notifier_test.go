@@ -3,9 +3,7 @@ package notifier
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/go-coldbrew/errors"
 	"github.com/go-coldbrew/options"
@@ -33,50 +31,28 @@ func TestGetTraceId_StringValue(t *testing.T) {
 }
 
 func TestNotifyAsync_BoundedConcurrency(t *testing.T) {
-	// Set a tiny semaphore so we can observe drops.
+	// Use a 1-slot semaphore and pre-fill it to simulate a full pool.
 	ch := make(chan struct{}, 1)
+	ch <- struct{}{} // pre-fill: pool is now full
 	asyncSem.Store(&ch)
 	t.Cleanup(func() {
-		// Drain any tokens left by test goroutines.
-		select {
-		case <-ch:
-		default:
+		// Restore default. Drain first so cleanup is safe.
+		for len(ch) > 0 {
+			<-ch
 		}
-		// Restore default.
 		def := make(chan struct{}, 20)
 		asyncSem.Store(&def)
 	})
 
-	// Fill the single slot with a blocking goroutine.
-	block := make(chan struct{})
-	blockErr := errors.New("blocker")
-	NotifyAsync(blockErr) // takes the one slot
-	// Give the goroutine a moment to acquire the semaphore token.
-	time.Sleep(10 * time.Millisecond)
+	// With the semaphore full, NotifyAsync must drop (hit default branch).
+	// It should not block and should not spawn a goroutine.
+	NotifyAsync(errors.New("should-drop"))
 
-	// Now the semaphore is full. Additional calls should be dropped.
-	var dropped atomic.Int32
-	originalDebug := NotifyAsync(errors.New("should-drop"))
-	// NotifyAsync returns the error regardless of drop/send, so we can't
-	// check the return value. Instead, verify the semaphore is still full
-	// by checking we can't send another token.
-	select {
-	case ch <- struct{}{}:
-		// We could send — means the slot was free, which means the previous
-		// call was dropped (it didn't acquire). That's the expected path.
-		<-ch // put it back
-		dropped.Add(1)
-	default:
-		// Slot is full — the previous NotifyAsync got in, which shouldn't
-		// happen since we already filled it. This is also fine if timing
-		// allowed the blocker to finish.
+	// Verify the semaphore is still exactly full (1 token, capacity 1).
+	// If NotifyAsync had somehow acquired a slot, len would be < cap.
+	if len(ch) != cap(ch) {
+		t.Errorf("expected semaphore to remain full (len=%d, cap=%d); NotifyAsync should have dropped", len(ch), cap(ch))
 	}
-	_ = originalDebug
-
-	// Unblock the first goroutine so it releases the token.
-	close(block)
-	// Wait a bit for cleanup.
-	time.Sleep(50 * time.Millisecond)
 }
 
 func TestSetMaxAsyncNotifications_ConcurrentAccess(t *testing.T) {
