@@ -60,18 +60,18 @@ type customError struct {
 	basePath     string // snapshot of basePath at capture time
 	cause        error
 	wrapped      error // immediate parent for Unwrap() chain; may differ from cause
-	shouldNotify bool
+	shouldNotify atomic.Bool
 	status       *grpcstatus.Status
 }
 
 // ShouldNotify returns true if the error should be reported to notifiers.
 func (c *customError) ShouldNotify() bool {
-	return c.shouldNotify
+	return c.shouldNotify.Load()
 }
 
 // Notified marks the error as having been notified (or not).
 func (c *customError) Notified(status bool) {
-	c.shouldNotify = !status
+	c.shouldNotify.Store(!status)
 }
 
 // Error returns the error message.
@@ -233,30 +233,30 @@ func WrapWithSkipAndStatus(err error, msg string, skip int, status *grpcstatus.S
 	//if we have stack information reuse that
 	if e, ok := err.(ErrorExt); ok {
 		c := &customError{
-			Msg:          msg + e.Error(),
-			cause:        e.Cause(),
-			wrapped:      err, // preserve full chain for errors.Is/errors.As
-			status:       status,
-			shouldNotify: true,
+			Msg:     msg + e.Error(),
+			cause:   e.Cause(),
+			wrapped: err, // preserve full chain for errors.Is/errors.As
+			status:  status,
 		}
+		c.shouldNotify.Store(true)
 
 		c.stack = e.Callers()
 		if ce, ok := e.(*customError); ok {
 			c.basePath = ce.basePath
 		}
 		if n, ok := e.(NotifyExt); ok {
-			c.shouldNotify = n.ShouldNotify()
+			c.shouldNotify.Store(n.ShouldNotify())
 		}
 		return c
 	}
 
 	c := &customError{
-		Msg:          msg + err.Error(),
-		cause:        err,
-		wrapped:      err,
-		shouldNotify: true,
-		status:       status,
+		Msg:     msg + err.Error(),
+		cause:   err,
+		wrapped: err,
+		status:  status,
 	}
+	c.shouldNotify.Store(true)
 	c.captureStack(skip + 1)
 	return c
 

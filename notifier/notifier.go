@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	gobrake "github.com/airbrake/gobrake/v5"
@@ -35,11 +36,19 @@ var (
 	hostname           string
 	traceHeader        string = "x-trace-id"
 
-	// asyncSem is a semaphore that bounds the number of concurrent async
-	// notification goroutines. When full, new notifications are dropped
-	// to prevent goroutine explosion under sustained error bursts.
-	asyncSem = make(chan struct{}, 1000)
 )
+
+// asyncSem is a semaphore that bounds the number of concurrent async
+// notification goroutines. When full, new notifications are dropped
+// to prevent goroutine explosion under sustained error bursts.
+// Stored as atomic.Pointer to eliminate the race between SetMaxAsyncNotifications
+// and NotifyAsync goroutines reading the channel variable.
+var asyncSem atomic.Pointer[chan struct{}]
+
+func init() {
+	ch := make(chan struct{}, 20)
+	asyncSem.Store(&ch)
+}
 
 const (
 	tracerID = "tracerId"
@@ -50,11 +59,13 @@ var asyncSemOnce sync.Once
 // SetMaxAsyncNotifications sets the maximum number of concurrent async
 // notification goroutines. When the limit is reached, new async notifications
 // are dropped to prevent goroutine explosion under sustained error bursts.
-// Default is 1000. Can only be called once; subsequent calls are no-ops.
+// Default is 20. The first successful call wins; subsequent calls are no-ops.
+// It is safe to call concurrently with NotifyAsync.
 func SetMaxAsyncNotifications(n int) {
 	if n > 0 {
 		asyncSemOnce.Do(func() {
-			asyncSem = make(chan struct{}, n)
+			ch := make(chan struct{}, n)
+			asyncSem.Store(&ch)
 		})
 	}
 }
@@ -67,7 +78,7 @@ func NotifyAsync(err error, rawData ...interface{}) error {
 	if err == nil {
 		return nil
 	}
-	sem := asyncSem
+	sem := *asyncSem.Load()
 	select {
 	case sem <- struct{}{}:
 		data := append([]interface{}(nil), rawData...)
@@ -553,7 +564,9 @@ func SetTraceId(ctx context.Context) context.Context {
 func GetTraceId(ctx context.Context) string {
 	if o := options.FromContext(ctx); o != nil {
 		if data, found := o.Get(tracerID); found {
-			return data.(string)
+			if traceID, ok := data.(string); ok {
+				return traceID
+			}
 		}
 	}
 	if logCtx := loggers.FromContext(ctx); logCtx != nil {
