@@ -532,6 +532,8 @@ func SetRelease(rel string) {
 
 // SetTraceIdWithValue is like SetTraceId but also returns the resolved trace ID,
 // avoiding a separate GetTraceId call.
+// Callers must use the returned context, not the original ctx, so the stored
+// trace ID is preserved in options and log context.
 func SetTraceIdWithValue(ctx context.Context) (context.Context, string) {
 	span := oteltrace.SpanFromContext(ctx)
 	hasSpan := span.SpanContext().IsValid()
@@ -576,8 +578,6 @@ func SetTraceIdWithValue(ctx context.Context) (context.Context, string) {
 // SetTraceId updates the traceID based on context values
 // if no trace id is found then it will create one and update the context
 // You should use the context returned by this function instead of the one passed
-//
-//go:inline
 func SetTraceId(ctx context.Context) context.Context {
 	ctx, _ = SetTraceIdWithValue(ctx)
 	return ctx
