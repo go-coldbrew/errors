@@ -19,6 +19,7 @@ import (
 	"github.com/go-coldbrew/options"
 	"github.com/google/uuid"
 	rollbar "github.com/rollbar/rollbar-go"
+	otelattr "go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/metadata"
 )
@@ -533,10 +534,15 @@ func SetRelease(rel string) {
 // if no trace id is found then it will create one and update the context
 // You should use the context returned by this function instead of the one passed
 func SetTraceId(ctx context.Context) context.Context {
-	if GetTraceId(ctx) != "" {
+	if traceID := GetTraceId(ctx); traceID != "" {
+		// Trace ID already set — ensure it's linked to the OTEL span.
+		if span := oteltrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+			span.SetAttributes(otelattr.String("coldbrew.trace_id", traceID))
+		}
 		return ctx
 	}
 	var traceID string
+	// Check gRPC metadata first — client-supplied trace ID takes priority.
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		if id, ok := md["grpcmetadata-"+traceHeader]; ok {
 			traceID = strings.Join(id, ",")
@@ -544,16 +550,24 @@ func SetTraceId(ctx context.Context) context.Context {
 			traceID = strings.Join(id, ",")
 		}
 	}
-	if span := oteltrace.SpanFromContext(ctx); span.SpanContext().IsValid() && strings.TrimSpace(traceID) == "" {
-		traceID = span.SpanContext().TraceID().String()
+	// Fall back to OTEL span trace ID.
+	if strings.TrimSpace(traceID) == "" {
+		if span := oteltrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+			traceID = span.SpanContext().TraceID().String()
+		}
 	}
-	// if no trace id then create one
+	// Last resort: generate UUID.
 	if strings.TrimSpace(traceID) == "" {
 		u, err := uuid.NewRandom()
 		if err != nil {
 			u, _ = uuid.NewUUID()
 		}
 		traceID = u.String()
+	}
+	// Link the resolved trace ID to the OTEL span as an attribute
+	// so ColdBrew correlation ID and distributed trace are connected.
+	if span := oteltrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+		span.SetAttributes(otelattr.String("coldbrew.trace_id", traceID))
 	}
 	ctx = loggers.AddToLogContext(ctx, "trace", traceID)
 	return options.AddToOptions(ctx, tracerID, traceID)
