@@ -7,6 +7,9 @@ import (
 
 	"github.com/go-coldbrew/errors"
 	"github.com/go-coldbrew/options"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 func TestGetTraceId_NonStringValue(t *testing.T) {
@@ -74,4 +77,72 @@ func TestSetMaxAsyncNotifications_ConcurrentAccess(t *testing.T) {
 		}
 	}()
 	wg.Wait()
+}
+
+func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
+	t.Helper()
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	old := otel.GetTracerProvider()
+	otel.SetTracerProvider(tp)
+	t.Cleanup(func() {
+		otel.SetTracerProvider(old)
+		tp.Shutdown(context.Background())
+	})
+	return exporter
+}
+
+func TestSetTraceId_SetsOTELAttribute(t *testing.T) {
+	exporter := setupTestTracer(t)
+	ctx, span := otel.Tracer("test").Start(context.Background(), "test-span")
+	defer span.End()
+
+	SetTraceId(ctx)
+	span.End()
+
+	spans := exporter.GetSpans()
+	if len(spans) == 0 {
+		t.Fatal("expected at least one span")
+	}
+	found := false
+	for _, attr := range spans[0].Attributes {
+		if string(attr.Key) == "coldbrew.trace_id" && attr.Value.AsString() != "" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("coldbrew.trace_id attribute not found on span")
+	}
+}
+
+func TestSetTraceId_EarlyReturn_SetsOTELAttribute(t *testing.T) {
+	exporter := setupTestTracer(t)
+	ctx, span := otel.Tracer("test").Start(context.Background(), "test-span")
+	defer span.End()
+
+	// Pre-set trace ID so SetTraceId takes the early return path
+	ctx = options.AddToOptions(ctx, tracerID, "pre-existing-id")
+	SetTraceId(ctx)
+	span.End()
+
+	spans := exporter.GetSpans()
+	if len(spans) == 0 {
+		t.Fatal("expected at least one span")
+	}
+	found := false
+	for _, attr := range spans[0].Attributes {
+		if string(attr.Key) == "coldbrew.trace_id" && attr.Value.AsString() == "pre-existing-id" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("coldbrew.trace_id should be 'pre-existing-id' even on early return")
+	}
+}
+
+func TestSetTraceId_NoSpan_NoPanic(t *testing.T) {
+	ctx := SetTraceId(context.Background())
+	if GetTraceId(ctx) == "" {
+		t.Error("expected a generated trace ID")
+	}
 }
