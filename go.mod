@@ -5,7 +5,7 @@ go 1.25.8
 require (
 	github.com/airbrake/gobrake/v5 v5.6.2
 	github.com/getsentry/sentry-go v0.43.0
-	github.com/go-coldbrew/log v0.2.7
+	github.com/go-coldbrew/log v0.2.8
 	github.com/go-coldbrew/options v0.2.6
 	github.com/google/uuid v1.6.0
 	github.com/rollbar/rollbar-go v1.4.8
@@ -88,8 +88,6 @@ require (
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.8.0 // indirect
 	github.com/go-git/go-git/v5 v5.17.1 // indirect
-	github.com/go-kit/log v0.2.1 // indirect
-	github.com/go-logfmt/logfmt v0.6.1 // indirect
 	github.com/go-toolsmith/astcast v1.1.0 // indirect
 	github.com/go-toolsmith/astcopy v1.1.0 // indirect
 	github.com/go-toolsmith/astequal v1.2.0 // indirect
