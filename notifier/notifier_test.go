@@ -7,6 +7,10 @@ import (
 
 	"github.com/go-coldbrew/errors"
 	"github.com/go-coldbrew/options"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"google.golang.org/grpc/metadata"
 )
 
 func TestGetTraceId_NonStringValue(t *testing.T) {
@@ -74,4 +78,106 @@ func TestSetMaxAsyncNotifications_ConcurrentAccess(t *testing.T) {
 		}
 	}()
 	wg.Wait()
+}
+
+func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
+	t.Helper()
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	old := otel.GetTracerProvider()
+	otel.SetTracerProvider(tp)
+	t.Cleanup(func() {
+		otel.SetTracerProvider(old)
+		tp.Shutdown(context.Background())
+	})
+	return exporter
+}
+
+func TestSetTraceId_SetsOTELAttribute(t *testing.T) {
+	exporter := setupTestTracer(t)
+	ctx, span := otel.Tracer("test").Start(context.Background(), "test-span")
+
+	ctx = SetTraceId(ctx)
+	expectedTraceID := GetTraceId(ctx)
+	span.End()
+
+	spans := exporter.GetSpans()
+	if len(spans) == 0 {
+		t.Fatal("expected at least one span")
+	}
+	found := false
+	for _, attr := range spans[0].Attributes {
+		if string(attr.Key) == "coldbrew.trace_id" {
+			if attr.Value.AsString() != expectedTraceID {
+				t.Errorf("coldbrew.trace_id = %q, want %q", attr.Value.AsString(), expectedTraceID)
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Error("coldbrew.trace_id attribute not found on span")
+	}
+}
+
+func TestSetTraceId_EarlyReturn_SetsOTELAttribute(t *testing.T) {
+	exporter := setupTestTracer(t)
+	ctx, span := otel.Tracer("test").Start(context.Background(), "test-span")
+
+	// Pre-set trace ID so SetTraceId takes the early return path
+	ctx = options.AddToOptions(ctx, tracerID, "pre-existing-id")
+	ctx = SetTraceId(ctx)
+	span.End()
+
+	spans := exporter.GetSpans()
+	if len(spans) == 0 {
+		t.Fatal("expected at least one span")
+	}
+	found := false
+	for _, attr := range spans[0].Attributes {
+		if string(attr.Key) == "coldbrew.trace_id" && attr.Value.AsString() == "pre-existing-id" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("coldbrew.trace_id should be 'pre-existing-id' even on early return")
+	}
+}
+
+func TestSetTraceId_MetadataPriority(t *testing.T) {
+	exporter := setupTestTracer(t)
+	ctx, span := otel.Tracer("test").Start(context.Background(), "test-span")
+
+	// Inject gRPC metadata with a trace header — should take priority over OTEL span trace ID
+	md := metadata.Pairs(traceHeader, "metadata-trace-id-123")
+	ctx = metadata.NewIncomingContext(ctx, md)
+
+	ctx = SetTraceId(ctx)
+	traceID := GetTraceId(ctx)
+	span.End()
+
+	if traceID != "metadata-trace-id-123" {
+		t.Errorf("expected metadata trace ID 'metadata-trace-id-123', got %q", traceID)
+	}
+
+	// Verify the attribute on the span matches the metadata trace ID
+	spans := exporter.GetSpans()
+	if len(spans) == 0 {
+		t.Fatal("expected at least one span")
+	}
+	found := false
+	for _, attr := range spans[0].Attributes {
+		if string(attr.Key) == "coldbrew.trace_id" && attr.Value.AsString() == "metadata-trace-id-123" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("coldbrew.trace_id should be the metadata-supplied trace ID, not OTEL span trace ID")
+	}
+}
+
+func TestSetTraceId_NoSpan_NoPanic(t *testing.T) {
+	ctx := SetTraceId(context.Background())
+	if GetTraceId(ctx) == "" {
+		t.Error("expected a generated trace ID")
+	}
 }
