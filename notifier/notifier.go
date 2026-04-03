@@ -530,16 +530,18 @@ func SetRelease(rel string) {
 	sentryRelease = rel
 }
 
-// SetTraceId updates the traceID based on context values
-// if no trace id is found then it will create one and update the context
-// You should use the context returned by this function instead of the one passed
-func SetTraceId(ctx context.Context) context.Context {
+// SetTraceIdWithValue is like SetTraceId but also returns the resolved trace ID,
+// avoiding a separate GetTraceId call.
+func SetTraceIdWithValue(ctx context.Context) (context.Context, string) {
+	span := oteltrace.SpanFromContext(ctx)
+	hasSpan := span.SpanContext().IsValid()
+
 	if traceID := GetTraceId(ctx); traceID != "" {
 		// Trace ID already set — ensure it's linked to the OTEL span.
-		if span := oteltrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+		if hasSpan {
 			span.SetAttributes(otelattr.String("coldbrew.trace_id", traceID))
 		}
-		return ctx
+		return ctx, traceID
 	}
 	var traceID string
 	// Check gRPC metadata first — client-supplied trace ID takes priority.
@@ -551,10 +553,8 @@ func SetTraceId(ctx context.Context) context.Context {
 		}
 	}
 	// Fall back to OTEL span trace ID.
-	if strings.TrimSpace(traceID) == "" {
-		if span := oteltrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
-			traceID = span.SpanContext().TraceID().String()
-		}
+	if strings.TrimSpace(traceID) == "" && hasSpan {
+		traceID = span.SpanContext().TraceID().String()
 	}
 	// Last resort: generate UUID.
 	if strings.TrimSpace(traceID) == "" {
@@ -566,11 +566,21 @@ func SetTraceId(ctx context.Context) context.Context {
 	}
 	// Link the resolved trace ID to the OTEL span as an attribute
 	// so ColdBrew correlation ID and distributed trace are connected.
-	if span := oteltrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+	if hasSpan {
 		span.SetAttributes(otelattr.String("coldbrew.trace_id", traceID))
 	}
 	ctx = loggers.AddToLogContext(ctx, "trace", traceID)
-	return options.AddToOptions(ctx, tracerID, traceID)
+	return options.AddToOptions(ctx, tracerID, traceID), traceID
+}
+
+// SetTraceId updates the traceID based on context values
+// if no trace id is found then it will create one and update the context
+// You should use the context returned by this function instead of the one passed
+//
+//go:inline
+func SetTraceId(ctx context.Context) context.Context {
+	ctx, _ = SetTraceIdWithValue(ctx)
+	return ctx
 }
 
 // GetTraceId fetches traceID from context

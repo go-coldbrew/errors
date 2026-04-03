@@ -181,3 +181,53 @@ func TestSetTraceId_NoSpan_NoPanic(t *testing.T) {
 		t.Error("expected a generated trace ID")
 	}
 }
+
+func TestSetTraceIdWithValue_ReturnsTraceID(t *testing.T) {
+	ctx, traceID := SetTraceIdWithValue(context.Background())
+	if traceID == "" {
+		t.Fatal("expected a non-empty trace ID")
+	}
+	if got := GetTraceId(ctx); got != traceID {
+		t.Errorf("GetTraceId = %q, want %q", got, traceID)
+	}
+}
+
+func TestSetTraceIdWithValue_ExistingTraceID(t *testing.T) {
+	ctx := options.AddToOptions(context.Background(), tracerID, "existing-id")
+	ctx, traceID := SetTraceIdWithValue(ctx)
+	if traceID != "existing-id" {
+		t.Errorf("expected existing-id, got %q", traceID)
+	}
+	if got := GetTraceId(ctx); got != "existing-id" {
+		t.Errorf("GetTraceId = %q, want existing-id", got)
+	}
+}
+
+func TestSetTraceIdWithValue_SetsOTELAttribute(t *testing.T) {
+	exporter := setupTestTracer(t)
+	ctx, span := otel.Tracer("test").Start(context.Background(), "test-span")
+
+	ctx, traceID := SetTraceIdWithValue(ctx)
+	span.End()
+
+	if traceID == "" {
+		t.Fatal("expected a non-empty trace ID")
+	}
+	if got := GetTraceId(ctx); got != traceID {
+		t.Errorf("GetTraceId = %q, want %q", got, traceID)
+	}
+
+	spans := exporter.GetSpans()
+	if len(spans) == 0 {
+		t.Fatal("expected at least one span")
+	}
+	found := false
+	for _, attr := range spans[0].Attributes {
+		if string(attr.Key) == "coldbrew.trace_id" && attr.Value.AsString() == traceID {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("coldbrew.trace_id attribute not found on span")
+	}
+}
