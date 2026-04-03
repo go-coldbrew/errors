@@ -125,7 +125,7 @@ func TestSetTraceId_EarlyReturn_SetsOTELAttribute(t *testing.T) {
 
 	// Pre-set trace ID so SetTraceId takes the early return path
 	ctx = options.AddToOptions(ctx, tracerID, "pre-existing-id")
-	SetTraceId(ctx)
+	ctx = SetTraceId(ctx)
 	span.End()
 
 	spans := exporter.GetSpans()
