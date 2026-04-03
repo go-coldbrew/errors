@@ -534,7 +534,11 @@ func SetRelease(rel string) {
 // if no trace id is found then it will create one and update the context
 // You should use the context returned by this function instead of the one passed
 func SetTraceId(ctx context.Context) context.Context {
-	if GetTraceId(ctx) != "" {
+	if traceID := GetTraceId(ctx); traceID != "" {
+		// Trace ID already set — ensure it's linked to the OTEL span.
+		if span := oteltrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+			span.SetAttributes(otelattr.String("coldbrew.trace_id", traceID))
+		}
 		return ctx
 	}
 	var traceID string
