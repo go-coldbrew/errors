@@ -28,15 +28,14 @@ import (
 var _ = log.SupportPackageIsVersion1
 
 var (
-	airbrake           *gobrake.Notifier
-	rollbarInited      bool
-	sentryInited       bool
-	sentryEnvironment  string
-	sentryRelease      string
-	serverRoot         string
-	hostname           string
-	traceHeader        string = "x-trace-id"
-
+	airbrake          *gobrake.Notifier
+	rollbarInited     bool
+	sentryInited      bool
+	sentryEnvironment string
+	sentryRelease     string
+	serverRoot        string
+	hostname          string
+	traceHeader       string = "x-trace-id"
 )
 
 // asyncSem is a semaphore that bounds the number of concurrent async
@@ -335,7 +334,6 @@ func NotifyWithLevelAndSkip(err error, skip int, level string, rawData ...interf
 		n.Notified(true)
 	}
 	return doNotify(err, skip, level, rawData...)
-
 }
 
 func doNotify(err error, skip int, level string, rawData ...interface{}) error {
@@ -653,7 +651,7 @@ func UpdateTraceId(ctx context.Context, traceID string) context.Context {
 	if traceIDValidator != nil {
 		traceID = traceIDValidator(traceID)
 	}
-	if traceID == "" {
+	if strings.TrimSpace(traceID) == "" {
 		return SetTraceId(ctx)
 	}
 	ctx = loggers.AddToLogContext(ctx, "trace", traceID)

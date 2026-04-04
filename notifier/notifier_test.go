@@ -247,6 +247,7 @@ func TestValidateTraceID(t *testing.T) {
 		{"null bytes stripped", "abc\x00def", "abcdef"},
 		{"control chars stripped", "abc\x01\x02\x03def", "abcdef"},
 		{"tab stripped", "abc\tdef", "abcdef"},
+		{"non-ASCII UTF-8 stripped", "abc\xc3\xa9\xe4\xb8\xad\xf0\x9f\x99\x82def", "abcdef"},
 		{"spaces preserved", "abc def", "abc def"},
 		{"printable special chars preserved", "abc!@#$%^&*()def", "abc!@#$%^&*()def"},
 		{"only non-printable returns empty", "\x00\x01\x02", ""},
