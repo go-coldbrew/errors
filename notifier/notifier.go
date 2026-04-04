@@ -28,15 +28,14 @@ import (
 var _ = log.SupportPackageIsVersion1
 
 var (
-	airbrake           *gobrake.Notifier
-	rollbarInited      bool
-	sentryInited       bool
-	sentryEnvironment  string
-	sentryRelease      string
-	serverRoot         string
-	hostname           string
-	traceHeader        string = "x-trace-id"
-
+	airbrake          *gobrake.Notifier
+	rollbarInited     bool
+	sentryInited      bool
+	sentryEnvironment string
+	sentryRelease     string
+	serverRoot        string
+	hostname          string
+	traceHeader       string = "x-trace-id"
 )
 
 // asyncSem is a semaphore that bounds the number of concurrent async
@@ -335,7 +334,6 @@ func NotifyWithLevelAndSkip(err error, skip int, level string, rawData ...interf
 		n.Notified(true)
 	}
 	return doNotify(err, skip, level, rawData...)
-
 }
 
 func doNotify(err error, skip int, level string, rawData ...interface{}) error {
@@ -554,6 +552,10 @@ func SetTraceIdWithValue(ctx context.Context) (context.Context, string) {
 			traceID = strings.Join(id, ",")
 		}
 	}
+	// Sanitize client-supplied trace ID to prevent log injection and DoS.
+	if traceIDValidator != nil {
+		traceID = traceIDValidator(traceID)
+	}
 	// Fall back to OTEL span trace ID.
 	if strings.TrimSpace(traceID) == "" && hasSpan {
 		traceID = span.SpanContext().TraceID().String()
@@ -604,11 +606,53 @@ func GetTraceId(ctx context.Context) string {
 	return ""
 }
 
+// traceIDValidator is the active trace ID validation function.
+// Defaults to validateTraceID. Set to nil to disable validation.
+var traceIDValidator = validateTraceID
+
+// SetTraceIDValidator sets a custom trace ID validation function.
+// The function receives a raw trace ID and must return the sanitized version.
+// Returning an empty string triggers the standard trace ID resolution flow
+// (existing ctx → gRPC metadata → OTEL span trace ID → generate UUID), not direct generation.
+// Set to nil to disable validation entirely (not recommended).
+// Must be called during init — not safe for concurrent use.
+func SetTraceIDValidator(fn func(string) string) {
+	traceIDValidator = fn
+}
+
+// validateTraceID sanitizes a trace ID to prevent log injection and
+// ensure it is safe to propagate through logs, error reports, and
+// OTEL span attributes. Empty strings pass through unchanged.
+// Rules:
+//   - Maximum 128 characters (truncated if longer)
+//   - Only printable ASCII (0x20-0x7E) retained
+//   - Non-printable, control characters, and non-ASCII bytes are stripped
+func validateTraceID(id string) string {
+	if id == "" {
+		return ""
+	}
+	if len(id) > 128 {
+		id = id[:128]
+	}
+	var b strings.Builder
+	b.Grow(len(id))
+	for i := 0; i < len(id); i++ {
+		c := id[i]
+		if c >= 0x20 && c <= 0x7E {
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
+
 // UpdateTraceId force updates the traced id to provided id
 // if no trace id is found then it will create one and update the context
 // You should use the context returned by this function instead of the one passed
 func UpdateTraceId(ctx context.Context, traceID string) context.Context {
-	if traceID == "" {
+	if traceIDValidator != nil {
+		traceID = traceIDValidator(traceID)
+	}
+	if strings.TrimSpace(traceID) == "" {
 		return SetTraceId(ctx)
 	}
 	ctx = loggers.AddToLogContext(ctx, "trace", traceID)
