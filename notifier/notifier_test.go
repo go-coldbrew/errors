@@ -298,3 +298,36 @@ func TestUpdateTraceId_AllInvalidFallsBackToGenerated(t *testing.T) {
 		t.Error("expected a generated trace ID when all chars are invalid")
 	}
 }
+
+func TestSetTraceIDValidator_Custom(t *testing.T) {
+	old := traceIDValidator
+	t.Cleanup(func() { traceIDValidator = old })
+
+	SetTraceIDValidator(func(id string) string {
+		return "custom-" + id
+	})
+
+	md := metadata.Pairs(traceHeader, "abc")
+	ctx := metadata.NewIncomingContext(context.Background(), md)
+	ctx = SetTraceId(ctx)
+	got := GetTraceId(ctx)
+	if got != "custom-abc" {
+		t.Errorf("expected custom validator applied, got %q", got)
+	}
+}
+
+func TestSetTraceIDValidator_Nil(t *testing.T) {
+	old := traceIDValidator
+	t.Cleanup(func() { traceIDValidator = old })
+
+	SetTraceIDValidator(nil)
+
+	// With nil validator, raw trace ID passes through unmodified
+	md := metadata.Pairs(traceHeader, "raw\x00id")
+	ctx := metadata.NewIncomingContext(context.Background(), md)
+	ctx = SetTraceId(ctx)
+	got := GetTraceId(ctx)
+	if got != "raw\x00id" {
+		t.Errorf("expected raw trace ID with nil validator, got %q", got)
+	}
+}

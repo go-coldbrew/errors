@@ -555,7 +555,9 @@ func SetTraceIdWithValue(ctx context.Context) (context.Context, string) {
 		}
 	}
 	// Sanitize client-supplied trace ID to prevent log injection and DoS.
-	traceID = validateTraceID(traceID)
+	if traceIDValidator != nil {
+		traceID = traceIDValidator(traceID)
+	}
 	// Fall back to OTEL span trace ID.
 	if strings.TrimSpace(traceID) == "" && hasSpan {
 		traceID = span.SpanContext().TraceID().String()
@@ -606,6 +608,19 @@ func GetTraceId(ctx context.Context) string {
 	return ""
 }
 
+// traceIDValidator is the active trace ID validation function.
+// Defaults to validateTraceID. Set to nil to disable validation.
+var traceIDValidator = validateTraceID
+
+// SetTraceIDValidator sets a custom trace ID validation function.
+// The function receives a raw trace ID and must return the sanitized version.
+// Return an empty string to trigger automatic trace ID generation.
+// Set to nil to disable validation entirely (not recommended).
+// Must be called during init — not safe for concurrent use.
+func SetTraceIDValidator(fn func(string) string) {
+	traceIDValidator = fn
+}
+
 // validateTraceID sanitizes a trace ID to prevent log injection and
 // ensure it is safe to propagate through logs, error reports, and
 // OTEL span attributes. Empty strings pass through unchanged.
@@ -635,7 +650,9 @@ func validateTraceID(id string) string {
 // if no trace id is found then it will create one and update the context
 // You should use the context returned by this function instead of the one passed
 func UpdateTraceId(ctx context.Context, traceID string) context.Context {
-	traceID = validateTraceID(traceID)
+	if traceIDValidator != nil {
+		traceID = traceIDValidator(traceID)
+	}
 	if traceID == "" {
 		return SetTraceId(ctx)
 	}
