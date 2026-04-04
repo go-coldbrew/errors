@@ -2,6 +2,7 @@ package notifier
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
@@ -229,5 +230,71 @@ func TestSetTraceIdWithValue_SetsOTELAttribute(t *testing.T) {
 	}
 	if !found {
 		t.Error("coldbrew.trace_id attribute not found on span")
+	}
+}
+
+func TestValidateTraceID(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"empty stays empty", "", ""},
+		{"normal ASCII passes through", "abc-123-def", "abc-123-def"},
+		{"UUID passes through", "550e8400-e29b-41d4-a716-446655440000", "550e8400-e29b-41d4-a716-446655440000"},
+		{"truncated at 128 chars", strings.Repeat("a", 200), strings.Repeat("a", 128)},
+		{"newlines stripped", "abc\ndef\rghi", "abcdefghi"},
+		{"null bytes stripped", "abc\x00def", "abcdef"},
+		{"control chars stripped", "abc\x01\x02\x03def", "abcdef"},
+		{"tab stripped", "abc\tdef", "abcdef"},
+		{"spaces preserved", "abc def", "abc def"},
+		{"printable special chars preserved", "abc!@#$%^&*()def", "abc!@#$%^&*()def"},
+		{"only non-printable returns empty", "\x00\x01\x02", ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := validateTraceID(tc.input)
+			if got != tc.want {
+				t.Errorf("validateTraceID(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSetTraceId_ValidatesMetadataTraceID(t *testing.T) {
+	md := metadata.Pairs(traceHeader, "valid-id-123\x00\nnewline")
+	ctx := metadata.NewIncomingContext(context.Background(), md)
+	ctx = SetTraceId(ctx)
+	got := GetTraceId(ctx)
+	if got != "valid-id-123newline" {
+		t.Errorf("expected sanitized trace ID %q, got %q", "valid-id-123newline", got)
+	}
+}
+
+func TestSetTraceId_TruncatesLongMetadataTraceID(t *testing.T) {
+	longID := strings.Repeat("x", 200)
+	md := metadata.Pairs(traceHeader, longID)
+	ctx := metadata.NewIncomingContext(context.Background(), md)
+	ctx = SetTraceId(ctx)
+	got := GetTraceId(ctx)
+	if len(got) != 128 {
+		t.Errorf("expected truncated to 128 chars, got %d", len(got))
+	}
+}
+
+func TestUpdateTraceId_ValidatesInput(t *testing.T) {
+	ctx := options.AddToOptions(context.Background(), tracerID, "")
+	ctx = UpdateTraceId(ctx, "good-id\x00\nbad")
+	got := GetTraceId(ctx)
+	if got != "good-idbad" {
+		t.Errorf("expected sanitized trace ID %q, got %q", "good-idbad", got)
+	}
+}
+
+func TestUpdateTraceId_AllInvalidFallsBackToGenerated(t *testing.T) {
+	ctx := UpdateTraceId(context.Background(), "\x00\x01\x02")
+	got := GetTraceId(ctx)
+	if got == "" {
+		t.Error("expected a generated trace ID when all chars are invalid")
 	}
 }

@@ -554,6 +554,8 @@ func SetTraceIdWithValue(ctx context.Context) (context.Context, string) {
 			traceID = strings.Join(id, ",")
 		}
 	}
+	// Sanitize client-supplied trace ID to prevent log injection and DoS.
+	traceID = validateTraceID(traceID)
 	// Fall back to OTEL span trace ID.
 	if strings.TrimSpace(traceID) == "" && hasSpan {
 		traceID = span.SpanContext().TraceID().String()
@@ -604,10 +606,36 @@ func GetTraceId(ctx context.Context) string {
 	return ""
 }
 
+// validateTraceID sanitizes a trace ID to prevent log injection and
+// ensure it is safe to propagate through logs, error reports, and
+// OTEL span attributes. Empty strings pass through unchanged.
+// Rules:
+//   - Maximum 128 characters (truncated if longer)
+//   - Only printable ASCII (0x20-0x7E) retained
+//   - Non-printable, control characters, and non-ASCII bytes are stripped
+func validateTraceID(id string) string {
+	if id == "" {
+		return ""
+	}
+	if len(id) > 128 {
+		id = id[:128]
+	}
+	var b strings.Builder
+	b.Grow(len(id))
+	for i := 0; i < len(id); i++ {
+		c := id[i]
+		if c >= 0x20 && c <= 0x7E {
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
+
 // UpdateTraceId force updates the traced id to provided id
 // if no trace id is found then it will create one and update the context
 // You should use the context returned by this function instead of the one passed
 func UpdateTraceId(ctx context.Context, traceID string) context.Context {
+	traceID = validateTraceID(traceID)
 	if traceID == "" {
 		return SetTraceId(ctx)
 	}
