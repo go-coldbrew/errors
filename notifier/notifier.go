@@ -613,7 +613,7 @@ var traceIDValidator = validateTraceID
 // SetTraceIDValidator sets a custom trace ID validation function.
 // The function receives a raw trace ID and must return the sanitized version.
 // Returning an empty string triggers the standard trace ID resolution flow
-// (OTEL span trace ID → gRPC metadata → generate UUID), not direct generation.
+// (existing ctx → gRPC metadata → OTEL span trace ID → generate UUID), not direct generation.
 // Set to nil to disable validation entirely (not recommended).
 // Must be called during init — not safe for concurrent use.
 func SetTraceIDValidator(fn func(string) string) {
