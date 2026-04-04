@@ -158,7 +158,7 @@ func SetEnvironment(env string)
 SetEnvironment sets the environment. The environment is used to distinguish errors occurring in different
 
 <a name="SetHostname"></a>
-## func [SetHostname](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L669>)
+## func [SetHostname](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L670>)
 
 ```go
 func SetHostname(name string)
@@ -185,7 +185,7 @@ func SetRelease(rel string)
 SetRelease sets the release tag. The release tag is used to group errors together by release.
 
 <a name="SetServerRoot"></a>
-## func [SetServerRoot](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L663>)
+## func [SetServerRoot](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L664>)
 
 ```go
 func SetServerRoot(path string)
@@ -203,13 +203,13 @@ func SetTraceHeaderName(name string)
 SetTraceHeaderName sets the header name for trace id default is x\-trace\-id
 
 <a name="SetTraceIDValidator"></a>
-## func [SetTraceIDValidator](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L618>)
+## func [SetTraceIDValidator](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L619>)
 
 ```go
 func SetTraceIDValidator(fn func(string) string)
 ```
 
-SetTraceIDValidator sets a custom trace ID validation function. The function receives a raw trace ID and must return the sanitized version. Return an empty string to trigger automatic trace ID generation. Set to nil to disable validation entirely \(not recommended\). Must be called during init — not safe for concurrent use.
+SetTraceIDValidator sets a custom trace ID validation function. The function receives a raw trace ID and must return the sanitized version. Returning an empty string triggers the standard trace ID resolution flow \(OTEL span trace ID → gRPC metadata → generate UUID\), not direct generation. Set to nil to disable validation entirely \(not recommended\). Must be called during init — not safe for concurrent use.
 
 <a name="SetTraceId"></a>
 ## func [SetTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L583>)
@@ -230,7 +230,7 @@ func SetTraceIdWithValue(ctx context.Context) (context.Context, string)
 SetTraceIdWithValue is like SetTraceId but also returns the resolved trace ID, avoiding a separate GetTraceId call. Callers must use the returned context, not the original ctx, so the stored trace ID is preserved in options and log context.
 
 <a name="UpdateTraceId"></a>
-## func [UpdateTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L650>)
+## func [UpdateTraceId](<https://github.com/go-coldbrew/errors/blob/main/notifier/notifier.go#L651>)
 
 ```go
 func UpdateTraceId(ctx context.Context, traceID string) context.Context
