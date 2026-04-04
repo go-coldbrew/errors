@@ -634,6 +634,19 @@ func validateTraceID(id string) string {
 	if len(id) > 128 {
 		id = id[:128]
 	}
+	// Fast path: most trace IDs (UUIDs, hex) are already clean.
+	// Scan first to avoid strings.Builder allocation.
+	clean := true
+	for i := 0; i < len(id); i++ {
+		if id[i] < 0x20 || id[i] > 0x7E {
+			clean = false
+			break
+		}
+	}
+	if clean {
+		return id
+	}
+	// Slow path: sanitize dirty input.
 	var b strings.Builder
 	b.Grow(len(id))
 	for i := 0; i < len(id); i++ {
