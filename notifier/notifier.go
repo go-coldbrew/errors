@@ -133,6 +133,9 @@ func InitAirbrake(projectID int64, projectKey string) {
 // token: rollbar token
 // env: rollbar environment
 func InitRollbar(token, env string) {
+	if token == "" {
+		return
+	}
 	rollbar.SetToken(token)
 	rollbar.SetEnvironment(env)
 	rollbar.SetStackTracer(func(err error) ([]runtime.Frame, bool) {
