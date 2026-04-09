@@ -1,6 +1,6 @@
 module github.com/go-coldbrew/errors
 
-go 1.25.8
+go 1.25.9
 
 require (
 	github.com/airbrake/gobrake/v5 v5.6.2
