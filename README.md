@@ -13,28 +13,45 @@
 import "github.com/go-coldbrew/errors"
 ```
 
-Package errors provides an implementation of golang error with stack strace information attached to it, the error objects created by this package are compatible with https://golang.org/pkg/errors/
+Package errors is a drop\-in replacement for the standard library "errors" package that adds stack trace capture, gRPC status codes, and error notification support.
 
-How To Use The simplest way to use this package is by calling one of the two functions
+All functions from the standard library errors package are re\-exported: [Is](<#Is>), [As](<#As>), [Unwrap](<#Unwrap>), [Join](<#Join>), and [ErrUnsupported](<#ErrUnsupported>). This allows you to use this package as your sole errors import:
+
+```
+import "github.com/go-coldbrew/errors"
+
+// Standard library functions work as expected:
+errors.Is(err, target)
+errors.As(err, &target)
+errors.Unwrap(err)
+errors.Join(err1, err2)
+
+// ColdBrew extensions add stack traces and gRPC status:
+errors.New("something failed")       // captures stack trace
+errors.Wrap(err, "context")          // wraps with stack trace
+errors.Cause(err)                    // walks Unwrap chain to root cause
+```
+
+### Error Creation
+
+The simplest way to use this package is by calling one of the two functions:
 
 ```
 errors.New(...)
 errors.Wrap(...)
 ```
 
-You can also initialize custom error stack by using one of the \`WithSkip\` functions. \`WithSkip\` allows skipping the defined number of functions from the stack information.
+You can also initialize custom error stack by using one of the WithSkip functions. WithSkip allows skipping the defined number of functions from the stack information.
 
 ```
-if you want to create a new error use New
-if you want to skip some functions on the stack use NewWithSkip
-if you want to add GRPC status use NewWithStatus
-if you want to skip some functions on the stack and add GRPC status use NewWithSkipAndStatus
-if you want to wrap an existing error use Wrap
-if you want to wrap an existing error and add GRPC status use WrapWithStatus
-if you want to wrap an existing error and skip some functions on the stack use WrapWithSkip
-if you want to wrap an existing error, skip some functions on the stack and add GRPC status use WrapWithSkipAndStatus
-if you want to wrap an existing error and add notifier options use WrapWithNotifier
-if you want to wrap an existing error, skip some functions on the stack and add notifier options use WrapWithSkipAndNotifier
+New                    — create a new error with stack info
+NewWithSkip            — skip functions on the stack
+NewWithStatus          — add GRPC status
+NewWithSkipAndStatus   — skip functions and add GRPC status
+Wrap                   — wrap an existing error
+WrapWithStatus         — wrap and add GRPC status
+WrapWithSkip           — wrap and skip functions on the stack
+WrapWithSkipAndStatus  — wrap, skip functions, and add GRPC status
 ```
 
 Head to https://docs.coldbrew.cloud for more information.
@@ -108,8 +125,15 @@ true
 ## Index
 
 - [Constants](<#constants>)
+- [Variables](<#variables>)
+- [func As\(err error, target any\) bool](<#As>)
+- [func AsType\[E error\]\(err error\) \(E, bool\)](<#AsType>)
+- [func Cause\(err error\) error](<#Cause>)
+- [func Is\(err, target error\) bool](<#Is>)
+- [func Join\(errs ...error\) error](<#Join>)
 - [func SetBaseFilePath\(path string\)](<#SetBaseFilePath>)
 - [func SetMaxStackDepth\(n int\)](<#SetMaxStackDepth>)
+- [func Unwrap\(err error\) error](<#Unwrap>)
 - [type ErrorExt](<#ErrorExt>)
   - [func New\(msg string\) ErrorExt](<#New>)
   - [func NewWithSkip\(msg string, skip int\) ErrorExt](<#NewWithSkip>)
@@ -133,6 +157,206 @@ true
 const SupportPackageIsVersion1 = true
 ```
 
+## Variables
+
+<a name="ErrUnsupported"></a>ErrUnsupported indicates that a requested operation cannot be performed, because it is unsupported.
+
+This is a re\-export of the standard library [errors.ErrUnsupported](<#ErrUnsupported>).
+
+```go
+var ErrUnsupported = stderrors.ErrUnsupported
+```
+
+<a name="As"></a>
+## func [As](<https://github.com/go-coldbrew/errors/blob/main/stdlib.go#L24>)
+
+```go
+func As(err error, target any) bool
+```
+
+As finds the first error in err's tree that matches target, and if one is found, sets target to that error value and returns true.
+
+This is a re\-export of the standard library [errors.As](<#As>).
+
+<details><summary>Example</summary>
+<p>
+
+
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/go-coldbrew/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+func main() {
+	grpcErr := errors.NewWithStatus("not found", status.New(codes.NotFound, "not found"))
+	wrapped := errors.Wrap(grpcErr, "lookup failed")
+
+	var ext errors.ErrorExt
+	if errors.As(wrapped, &ext) {
+		fmt.Println("found ErrorExt:", ext.GRPCStatus().Code())
+	}
+}
+```
+
+#### Output
+
+```
+found ErrorExt: NotFound
+```
+
+</p>
+</details>
+
+<a name="AsType"></a>
+## func [AsType](<https://github.com/go-coldbrew/errors/blob/main/stdlib_go126.go#L12>)
+
+```go
+func AsType[E error](err error) (E, bool)
+```
+
+AsType finds the first error in err's tree that matches the type E, and if one is found, returns that error value and true. Otherwise, it returns the zero value of E and false.
+
+This is a re\-export of the standard library [errors.AsType](<#AsType>).
+
+<a name="Cause"></a>
+## func [Cause](<https://github.com/go-coldbrew/errors/blob/main/stdlib.go#L63>)
+
+```go
+func Cause(err error) error
+```
+
+Cause walks the [Unwrap](<#Unwrap>) chain of err and returns the innermost \(root cause\) error. If err does not implement Unwrap, err itself is returned. If err is nil, nil is returned.
+
+For [ErrorExt](<#ErrorExt>) errors, this produces the same result as calling the Cause method, but this function works on any error that implements the standard Unwrap interface.
+
+Note: for multi\-errors \(errors implementing Unwrap\(\) \[\]error, such as those created by [Join](<#Join>)\), the single\-error Unwrap returns nil, so Cause returns the multi\-error itself.
+
+<details><summary>Example</summary>
+<p>
+
+
+
+```go
+package main
+
+import (
+	"fmt"
+	"io"
+
+	"github.com/go-coldbrew/errors"
+)
+
+func main() {
+	root := io.EOF
+	first := errors.Wrap(root, "read body")
+	second := errors.Wrap(first, "handle request")
+	fmt.Println(errors.Cause(second))
+}
+```
+
+#### Output
+
+```
+EOF
+```
+
+</p>
+</details>
+
+<a name="Is"></a>
+## func [Is](<https://github.com/go-coldbrew/errors/blob/main/stdlib.go#L16>)
+
+```go
+func Is(err, target error) bool
+```
+
+Is reports whether any error in err's tree matches target.
+
+An error is considered a match if it is equal to the target or if it implements an Is\(error\) bool method such that Is\(target\) returns true.
+
+This is a re\-export of the standard library [errors.Is](<#Is>).
+
+<details><summary>Example</summary>
+<p>
+
+
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/go-coldbrew/errors"
+)
+
+func main() {
+	base := fmt.Errorf("connection refused")
+	wrapped := errors.Wrap(base, "dial failed")
+	fmt.Println(errors.Is(wrapped, base))
+}
+```
+
+#### Output
+
+```
+true
+```
+
+</p>
+</details>
+
+<a name="Join"></a>
+## func [Join](<https://github.com/go-coldbrew/errors/blob/main/stdlib.go#L42>)
+
+```go
+func Join(errs ...error) error
+```
+
+Join returns an error that wraps the given errors. Any nil error values are discarded. Join returns nil if every value in errs is nil.
+
+This is a re\-export of the standard library [errors.Join](<#Join>).
+
+<details><summary>Example</summary>
+<p>
+
+
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/go-coldbrew/errors"
+)
+
+func main() {
+	err1 := errors.New("first")
+	err2 := errors.New("second")
+	joined := errors.Join(err1, err2)
+	fmt.Println(errors.Is(joined, err1))
+	fmt.Println(errors.Is(joined, err2))
+}
+```
+
+#### Output
+
+```
+true
+true
+```
+
+</p>
+</details>
+
 <a name="SetBaseFilePath"></a>
 ## func [SetBaseFilePath](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L285>)
 
@@ -150,6 +374,48 @@ func SetMaxStackDepth(n int)
 ```
 
 SetMaxStackDepth sets the maximum number of stack frames captured when creating errors. Accepts values in \[1, 256\]; out\-of\-range values are ignored. Default is 16. Safe for concurrent use.
+
+<a name="Unwrap"></a>
+## func [Unwrap](<https://github.com/go-coldbrew/errors/blob/main/stdlib.go#L33>)
+
+```go
+func Unwrap(err error) error
+```
+
+Unwrap returns the result of calling the Unwrap method on err, if err's type contains an Unwrap method returning error. Otherwise, Unwrap returns nil.
+
+This is a re\-export of the standard library [errors.Unwrap](<#Unwrap>).
+
+<details><summary>Example</summary>
+<p>
+
+
+
+```go
+package main
+
+import (
+	"fmt"
+	"io"
+
+	"github.com/go-coldbrew/errors"
+)
+
+func main() {
+	base := io.EOF
+	wrapped := errors.Wrap(base, "read failed")
+	fmt.Println(errors.Unwrap(wrapped))
+}
+```
+
+#### Output
+
+```
+EOF
+```
+
+</p>
+</details>
 
 <a name="ErrorExt"></a>
 ## type [ErrorExt](<https://github.com/go-coldbrew/errors/blob/main/errors.go#L34-L45>)
@@ -319,13 +585,12 @@ cause: EOF
 <details><summary>Example (Errors Is)</summary>
 <p>
 
-Wrapped errors are compatible with stdlib errors.Is for unwrapping.
+Wrapped errors are compatible with errors.Is for unwrapping. No separate "errors" import needed — Is is re\-exported.
 
 ```go
 package main
 
 import (
-	stderrors "errors"
 	"fmt"
 	"io"
 
@@ -335,7 +600,7 @@ import (
 func main() {
 	original := io.EOF
 	wrapped := errors.Wrap(original, "read failed")
-	fmt.Println(stderrors.Is(wrapped, io.EOF))
+	fmt.Println(errors.Is(wrapped, io.EOF))
 }
 ```
 

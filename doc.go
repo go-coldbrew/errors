@@ -1,26 +1,42 @@
 /*
-Package errors provides an implementation of golang error with stack strace information attached to it,
-the error objects created by this package are compatible with https://golang.org/pkg/errors/
+Package errors is a drop-in replacement for the standard library "errors" package
+that adds stack trace capture, gRPC status codes, and error notification support.
 
-How To Use
-The simplest way to use this package is by calling one of the two functions
+All functions from the standard library errors package are re-exported:
+[Is], [As], [Unwrap], [Join], and [ErrUnsupported].
+This allows you to use this package as your sole errors import:
+
+	import "github.com/go-coldbrew/errors"
+
+	// Standard library functions work as expected:
+	errors.Is(err, target)
+	errors.As(err, &target)
+	errors.Unwrap(err)
+	errors.Join(err1, err2)
+
+	// ColdBrew extensions add stack traces and gRPC status:
+	errors.New("something failed")       // captures stack trace
+	errors.Wrap(err, "context")          // wraps with stack trace
+	errors.Cause(err)                    // walks Unwrap chain to root cause
+
+# Error Creation
+
+The simplest way to use this package is by calling one of the two functions:
 
 	errors.New(...)
 	errors.Wrap(...)
 
-You can also initialize custom error stack by using one of the `WithSkip` functions. `WithSkip` allows
+You can also initialize custom error stack by using one of the WithSkip functions. WithSkip allows
 skipping the defined number of functions from the stack information.
 
-	if you want to create a new error use New
-	if you want to skip some functions on the stack use NewWithSkip
-	if you want to add GRPC status use NewWithStatus
-	if you want to skip some functions on the stack and add GRPC status use NewWithSkipAndStatus
-	if you want to wrap an existing error use Wrap
-	if you want to wrap an existing error and add GRPC status use WrapWithStatus
-	if you want to wrap an existing error and skip some functions on the stack use WrapWithSkip
-	if you want to wrap an existing error, skip some functions on the stack and add GRPC status use WrapWithSkipAndStatus
-	if you want to wrap an existing error and add notifier options use WrapWithNotifier
-	if you want to wrap an existing error, skip some functions on the stack and add notifier options use WrapWithSkipAndNotifier
+	New                    — create a new error with stack info
+	NewWithSkip            — skip functions on the stack
+	NewWithStatus          — add GRPC status
+	NewWithSkipAndStatus   — skip functions and add GRPC status
+	Wrap                   — wrap an existing error
+	WrapWithStatus         — wrap and add GRPC status
+	WrapWithSkip           — wrap and skip functions on the stack
+	WrapWithSkipAndStatus  — wrap, skip functions, and add GRPC status
 
 Head to https://docs.coldbrew.cloud for more information.
 */

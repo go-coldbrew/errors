@@ -9,7 +9,7 @@ import (
 )
 
 func TestWrap(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name     string
 		err      error
 		message  string
@@ -39,7 +39,6 @@ func TestWrap(t *testing.T) {
 			if grpcstatus.Convert(err).Message() != tt.expected {
 				t.Errorf("GRPC status msg expected %+v, got %+v", tt.expected, grpcstatus.Convert(err).Message())
 			}
-
 		})
 	}
 }
@@ -51,22 +50,22 @@ func TestErrorsIs(t *testing.T) {
 	wrapped2 := Wrap(wrapped1, "layer2")
 	wrapped3 := Wrap(wrapped2, "layer3")
 
-	if !stderrors.Is(wrapped1, base) {
+	if !Is(wrapped1, base) {
 		t.Error("wrapped1 should match base via errors.Is")
 	}
-	if !stderrors.Is(wrapped2, wrapped1) {
+	if !Is(wrapped2, wrapped1) {
 		t.Error("wrapped2 should match wrapped1 via errors.Is")
 	}
-	if !stderrors.Is(wrapped2, base) {
+	if !Is(wrapped2, base) {
 		t.Error("wrapped2 should match base via errors.Is")
 	}
-	if !stderrors.Is(wrapped3, wrapped2) {
+	if !Is(wrapped3, wrapped2) {
 		t.Error("wrapped3 should match wrapped2 via errors.Is")
 	}
-	if !stderrors.Is(wrapped3, wrapped1) {
+	if !Is(wrapped3, wrapped1) {
 		t.Error("wrapped3 should match wrapped1 via errors.Is")
 	}
-	if !stderrors.Is(wrapped3, base) {
+	if !Is(wrapped3, base) {
 		t.Error("wrapped3 should match base via errors.Is")
 	}
 }
@@ -99,7 +98,7 @@ func TestWrapf(t *testing.T) {
 	if err.Error() != expected {
 		t.Errorf("Wrapf() = %q, want %q", err.Error(), expected)
 	}
-	if !stderrors.Is(err, base) {
+	if !Is(err, base) {
 		t.Error("Wrapf result should match base via errors.Is")
 	}
 }
@@ -169,6 +168,114 @@ func TestSetMaxStackDepth(t *testing.T) {
 	}
 }
 
+func TestIs(t *testing.T) {
+	base := stderrors.New("base")
+	wrapped := Wrap(base, "wrapped")
+
+	if !Is(wrapped, base) {
+		t.Error("Is should find base through ColdBrew wrap")
+	}
+	if Is(wrapped, stderrors.New("other")) {
+		t.Error("Is should not match unrelated error")
+	}
+	if !Is(wrapped, wrapped) {
+		t.Error("Is should match error against itself")
+	}
+}
+
+func TestAs(t *testing.T) {
+	grpcErr := NewWithStatus("not found", grpcstatus.New(5, "not found"))
+	wrapped := Wrap(grpcErr, "lookup failed")
+
+	var ext ErrorExt
+	if !As(wrapped, &ext) {
+		t.Fatal("As should find ErrorExt in chain")
+	}
+	if ext.Error() != "lookup failed: not found" {
+		t.Errorf("As target = %q, want %q", ext.Error(), "lookup failed: not found")
+	}
+}
+
+func TestUnwrap(t *testing.T) {
+	base := stderrors.New("base")
+	wrapped := Wrap(base, "ctx")
+
+	unwrapped := Unwrap(wrapped)
+	if unwrapped == nil {
+		t.Fatal("Unwrap should return non-nil for wrapped error")
+	}
+	if unwrapped != base {
+		t.Errorf("Unwrap = %v, want %v", unwrapped, base)
+	}
+
+	// Unwrap on a non-wrapping error returns nil
+	plain := stderrors.New("plain")
+	if Unwrap(plain) != nil {
+		t.Error("Unwrap on non-wrapping error should return nil")
+	}
+}
+
+func TestJoin(t *testing.T) {
+	err1 := New("first")
+	err2 := stderrors.New("second")
+
+	joined := Join(err1, err2)
+	if joined == nil {
+		t.Fatal("Join should return non-nil")
+	}
+	if !Is(joined, err1) {
+		t.Error("Join result should contain first error")
+	}
+	if !Is(joined, err2) {
+		t.Error("Join result should contain second error")
+	}
+
+	// All nils returns nil
+	if Join(nil, nil) != nil {
+		t.Error("Join of all nils should return nil")
+	}
+}
+
+func TestErrUnsupported(t *testing.T) {
+	err := stderrors.ErrUnsupported
+	if !Is(err, ErrUnsupported) {
+		t.Error("ErrUnsupported should match stdlib ErrUnsupported via Is")
+	}
+}
+
+func TestCauseStandalone(t *testing.T) {
+	// Works on ColdBrew error chain
+	root := stderrors.New("root")
+	a := Wrap(root, "a")
+	b := Wrap(a, "b")
+
+	if got := Cause(b); got != root {
+		t.Errorf("Cause(b) = %v, want %v", got, root)
+	}
+	if got := Cause(a); got != root {
+		t.Errorf("Cause(a) = %v, want %v", got, root)
+	}
+
+	// Works on plain stdlib errors (no Unwrap)
+	plain := stderrors.New("plain")
+	if got := Cause(plain); got != plain {
+		t.Errorf("Cause(plain) = %v, want %v", got, plain)
+	}
+
+	// Returns nil for nil
+	if got := Cause(nil); got != nil {
+		t.Errorf("Cause(nil) = %v, want nil", got)
+	}
+
+	// Works on stdlib fmt.Errorf chains
+	import_io_err := io.EOF
+	fmtWrapped := stderrors.Join(import_io_err)
+	// Join uses Unwrap() []error, not Unwrap() error, so Cause returns itself
+	if got := Cause(fmtWrapped); got != fmtWrapped {
+		t.Errorf("Cause(joinedErr) = %v, want %v", got, fmtWrapped)
+	}
+}
+
 func TestStackFrameConsistency(t *testing.T) {
 	err := New("consistency test")
 
@@ -196,4 +303,3 @@ func TestStackFrameConsistency(t *testing.T) {
 		t.Fatalf("StackFrame count %d exceeds Callers count %d", len(frames1), len(pcs))
 	}
 }
-
