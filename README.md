@@ -15,7 +15,7 @@ import "github.com/go-coldbrew/errors"
 
 Package errors is a drop\-in replacement for the standard library "errors" package that adds stack trace capture, gRPC status codes, and error notification support.
 
-All functions from the standard library errors package are re\-exported: [Is](<#Is>), [As](<#As>), [Unwrap](<#Unwrap>), [Join](<#Join>), and [ErrUnsupported](<#ErrUnsupported>). This allows you to use this package as your sole errors import:
+The following standard library helpers are re\-exported: [Is](<#Is>), [As](<#As>), [Unwrap](<#Unwrap>), [Join](<#Join>), and the [ErrUnsupported](<#ErrUnsupported>) sentinel. This allows you to use this package as your sole errors import:
 
 ```
 import "github.com/go-coldbrew/errors"
@@ -161,7 +161,7 @@ const SupportPackageIsVersion1 = true
 
 <a name="ErrUnsupported"></a>ErrUnsupported indicates that a requested operation cannot be performed, because it is unsupported.
 
-This is a re\-export of the standard library [errors.ErrUnsupported](<#ErrUnsupported>).
+Re\-exported from the standard library errors package.
 
 ```go
 var ErrUnsupported = stderrors.ErrUnsupported
@@ -176,7 +176,7 @@ func As(err error, target any) bool
 
 As finds the first error in err's tree that matches target, and if one is found, sets target to that error value and returns true.
 
-This is a re\-export of the standard library [errors.As](<#As>).
+Re\-exported from the standard library errors package.
 
 <details><summary>Example</summary>
 <p>
@@ -223,10 +223,10 @@ func AsType[E error](err error) (E, bool)
 
 AsType finds the first error in err's tree that matches the type E, and if one is found, returns that error value and true. Otherwise, it returns the zero value of E and false.
 
-This is a re\-export of the standard library [errors.AsType](<#AsType>).
+Re\-exported from the standard library errors package \(requires Go 1.26\+\).
 
 <a name="Cause"></a>
-## func [Cause](<https://github.com/go-coldbrew/errors/blob/main/stdlib.go#L63>)
+## func [Cause](<https://github.com/go-coldbrew/errors/blob/main/stdlib.go#L67>)
 
 ```go
 func Cause(err error) error
@@ -281,7 +281,7 @@ Is reports whether any error in err's tree matches target.
 
 An error is considered a match if it is equal to the target or if it implements an Is\(error\) bool method such that Is\(target\) returns true.
 
-This is a re\-export of the standard library [errors.Is](<#Is>).
+Re\-exported from the standard library errors package.
 
 <details><summary>Example</summary>
 <p>
@@ -322,7 +322,7 @@ func Join(errs ...error) error
 
 Join returns an error that wraps the given errors. Any nil error values are discarded. Join returns nil if every value in errs is nil.
 
-This is a re\-export of the standard library [errors.Join](<#Join>).
+Re\-exported from the standard library errors package.
 
 <details><summary>Example</summary>
 <p>
@@ -384,7 +384,7 @@ func Unwrap(err error) error
 
 Unwrap returns the result of calling the Unwrap method on err, if err's type contains an Unwrap method returning error. Otherwise, Unwrap returns nil.
 
-This is a re\-export of the standard library [errors.Unwrap](<#Unwrap>).
+Re\-exported from the standard library errors package.
 
 <details><summary>Example</summary>
 <p>

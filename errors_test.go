@@ -267,12 +267,11 @@ func TestCauseStandalone(t *testing.T) {
 		t.Errorf("Cause(nil) = %v, want nil", got)
 	}
 
-	// Works on stdlib fmt.Errorf chains
-	import_io_err := io.EOF
-	fmtWrapped := stderrors.Join(import_io_err)
-	// Join uses Unwrap() []error, not Unwrap() error, so Cause returns itself
-	if got := Cause(fmtWrapped); got != fmtWrapped {
-		t.Errorf("Cause(joinedErr) = %v, want %v", got, fmtWrapped)
+	// Join multi-errors use Unwrap() []error, not Unwrap() error,
+	// so single-error Unwrap returns nil and Cause returns the Join itself.
+	joined := stderrors.Join(io.EOF)
+	if got := Cause(joined); got != joined {
+		t.Errorf("Cause(joinedErr) = %v, want %v", got, joined)
 	}
 }
 

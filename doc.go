@@ -2,8 +2,8 @@
 Package errors is a drop-in replacement for the standard library "errors" package
 that adds stack trace capture, gRPC status codes, and error notification support.
 
-All functions from the standard library errors package are re-exported:
-[Is], [As], [Unwrap], [Join], and [ErrUnsupported].
+The following standard library helpers are re-exported:
+[Is], [As], [Unwrap], [Join], and the [ErrUnsupported] sentinel.
 This allows you to use this package as your sole errors import:
 
 	import "github.com/go-coldbrew/errors"

@@ -12,7 +12,7 @@ import stderrors "errors"
 // An error is considered a match if it is equal to the target or if
 // it implements an Is(error) bool method such that Is(target) returns true.
 //
-// This is a re-export of the standard library [errors.Is].
+// Re-exported from the standard library errors package.
 func Is(err, target error) bool {
 	return stderrors.Is(err, target)
 }
@@ -20,7 +20,7 @@ func Is(err, target error) bool {
 // As finds the first error in err's tree that matches target,
 // and if one is found, sets target to that error value and returns true.
 //
-// This is a re-export of the standard library [errors.As].
+// Re-exported from the standard library errors package.
 func As(err error, target any) bool {
 	return stderrors.As(err, target)
 }
@@ -29,7 +29,7 @@ func As(err error, target any) bool {
 // if err's type contains an Unwrap method returning error.
 // Otherwise, Unwrap returns nil.
 //
-// This is a re-export of the standard library [errors.Unwrap].
+// Re-exported from the standard library errors package.
 func Unwrap(err error) error {
 	return stderrors.Unwrap(err)
 }
@@ -38,7 +38,7 @@ func Unwrap(err error) error {
 // Any nil error values are discarded. Join returns nil if every value
 // in errs is nil.
 //
-// This is a re-export of the standard library [errors.Join].
+// Re-exported from the standard library errors package.
 func Join(errs ...error) error {
 	return stderrors.Join(errs...)
 }
@@ -46,8 +46,12 @@ func Join(errs ...error) error {
 // ErrUnsupported indicates that a requested operation cannot be performed,
 // because it is unsupported.
 //
-// This is a re-export of the standard library [errors.ErrUnsupported].
+// Re-exported from the standard library errors package.
 var ErrUnsupported = stderrors.ErrUnsupported
+
+// maxCauseDepth is the upper bound on Unwrap iterations in [Cause]
+// to guard against cyclic Unwrap chains.
+const maxCauseDepth = 1024
 
 // Cause walks the [Unwrap] chain of err and returns the innermost
 // (root cause) error. If err does not implement Unwrap, err itself
@@ -61,11 +65,12 @@ var ErrUnsupported = stderrors.ErrUnsupported
 // those created by [Join]), the single-error Unwrap returns nil, so
 // Cause returns the multi-error itself.
 func Cause(err error) error {
-	for {
+	for range maxCauseDepth {
 		unwrapped := stderrors.Unwrap(err)
 		if unwrapped == nil {
 			return err
 		}
 		err = unwrapped
 	}
+	return err
 }

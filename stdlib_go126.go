@@ -8,7 +8,7 @@ import stderrors "errors"
 // and if one is found, returns that error value and true.
 // Otherwise, it returns the zero value of E and false.
 //
-// This is a re-export of the standard library [errors.AsType].
+// Re-exported from the standard library errors package (requires Go 1.26+).
 func AsType[E error](err error) (E, bool) {
 	return stderrors.AsType[E](err)
 }
