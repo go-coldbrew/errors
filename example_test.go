@@ -1,7 +1,6 @@
 package errors_test
 
 import (
-	stderrors "errors"
 	"fmt"
 	"io"
 
@@ -73,10 +72,55 @@ func Example_cause() {
 	// cause: EOF
 }
 
-// Wrapped errors are compatible with stdlib errors.Is for unwrapping.
+// Wrapped errors are compatible with errors.Is for unwrapping.
+// No separate "errors" import needed — Is is re-exported.
 func ExampleWrap_errorsIs() {
 	original := io.EOF
 	wrapped := errors.Wrap(original, "read failed")
-	fmt.Println(stderrors.Is(wrapped, io.EOF))
+	fmt.Println(errors.Is(wrapped, io.EOF))
 	// Output: true
+}
+
+func ExampleIs() {
+	base := fmt.Errorf("connection refused")
+	wrapped := errors.Wrap(base, "dial failed")
+	fmt.Println(errors.Is(wrapped, base))
+	// Output: true
+}
+
+func ExampleAs() {
+	grpcErr := errors.NewWithStatus("not found", status.New(codes.NotFound, "not found"))
+	wrapped := errors.Wrap(grpcErr, "lookup failed")
+
+	var ext errors.ErrorExt
+	if errors.As(wrapped, &ext) {
+		fmt.Println("found ErrorExt:", ext.GRPCStatus().Code())
+	}
+	// Output: found ErrorExt: NotFound
+}
+
+func ExampleJoin() {
+	err1 := errors.New("first")
+	err2 := errors.New("second")
+	joined := errors.Join(err1, err2)
+	fmt.Println(errors.Is(joined, err1))
+	fmt.Println(errors.Is(joined, err2))
+	// Output:
+	// true
+	// true
+}
+
+func ExampleUnwrap() {
+	base := io.EOF
+	wrapped := errors.Wrap(base, "read failed")
+	fmt.Println(errors.Unwrap(wrapped))
+	// Output: EOF
+}
+
+func ExampleCause() {
+	root := io.EOF
+	first := errors.Wrap(root, "read body")
+	second := errors.Wrap(first, "handle request")
+	fmt.Println(errors.Cause(second))
+	// Output: EOF
 }
