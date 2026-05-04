@@ -179,8 +179,8 @@ func TestSentryExtra(t *testing.T) {
 	if event == nil {
 		t.Fatal("expected captured event")
 	}
-	if len(event.Extra) == 0 {
-		t.Error("expected non-empty Extra on event")
+	if len(event.Contexts["extra"]) == 0 {
+		t.Error("expected non-empty extra context on event")
 	}
 }
 
@@ -226,8 +226,8 @@ func TestBuildSentryEvent(t *testing.T) {
 	if event.Message != "build event test" {
 		t.Errorf("expected message 'build event test', got %v", event.Message)
 	}
-	if event.Extra["key"] != "value" {
-		t.Errorf("expected extra key=value, got %v", event.Extra["key"])
+	if event.Contexts["extra"]["key"] != "value" {
+		t.Errorf("expected extra key=value, got %v", event.Contexts["extra"]["key"])
 	}
 	if event.Tags["tag1"] != "val1" {
 		t.Errorf("expected tag tag1=val1, got %v", event.Tags["tag1"])

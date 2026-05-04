@@ -295,7 +295,6 @@ func buildSentryEvent(err errors.ErrorExt, level string, extra map[string]interf
 		Level:       sentryLevel,
 		Environment: sentryEnvironment,
 		Release:     sentryRelease,
-		Extra:       extra,
 		Exception: []sentry.Exception{
 			{
 				Type:       reflect.TypeOf(err).String(),
@@ -303,6 +302,13 @@ func buildSentryEvent(err errors.ErrorExt, level string, extra map[string]interf
 				Stacktrace: convToSentry(err),
 			},
 		},
+	}
+
+	if len(extra) > 0 {
+		if event.Contexts == nil {
+			event.Contexts = make(map[string]sentry.Context)
+		}
+		event.Contexts["extra"] = extra
 	}
 
 	if len(tagData) > 0 {

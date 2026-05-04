@@ -4,7 +4,7 @@ go 1.25.9
 
 require (
 	github.com/airbrake/gobrake/v5 v5.6.2
-	github.com/getsentry/sentry-go v0.43.0
+	github.com/getsentry/sentry-go v0.46.2
 	github.com/go-coldbrew/log v0.3.0
 	github.com/go-coldbrew/options v0.3.0
 	github.com/google/uuid v1.6.0
