@@ -305,7 +305,10 @@ func buildSentryEvent(err errors.ErrorExt, level string, extra map[string]interf
 	}
 
 	if len(extra) > 0 {
-		event.Contexts = map[string]sentry.Context{"extra": extra}
+		if event.Contexts == nil {
+			event.Contexts = make(map[string]sentry.Context)
+		}
+		event.Contexts["extra"] = extra
 	}
 
 	if len(tagData) > 0 {
